@@ -45,13 +45,13 @@ func cleanup(t *testing.T) {
 
 func recursiveDelete(c *zk.Conn, path string) error {
 	children, _, err := c.Children(path)
-	if err != nil {
+	if err != nil && err != zk.ErrNoNode {
 		log.Printf("err finding children of %s", path)
 		return err
 	}
 	for _, child := range children {
 		err := recursiveDelete(c, path+"/"+child)
-		if err != nil {
+		if err != nil && err != zk.ErrNoNode {
 			log.Printf("err deleting %s", child)
 			return err
 		}
@@ -59,7 +59,7 @@ func recursiveDelete(c *zk.Conn, path string) error {
 
 	// get version
 	_, stat, err := c.Get(path)
-	if err != nil {
+	if err != nil && err != zk.ErrNoNode {
 		log.Printf("err getting version of %s", path)
 		return err
 	}
@@ -69,4 +69,20 @@ func recursiveDelete(c *zk.Conn, path string) error {
 
 func testPath(testname string) string {
 	return zkPrefix + "/" + testname
+}
+
+// return true if f takes longer than timeout to complete, false
+// otherwise
+func fnTimesOut(f func(), timeout time.Duration) bool {
+	ch := make(chan struct{})
+	go func() {
+		f()
+		ch <- struct{}{}
+	}()
+	select {
+	case <-ch:
+		return false
+	case <-time.After(timeout):
+		return true
+	}
 }
