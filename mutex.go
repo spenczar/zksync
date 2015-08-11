@@ -39,13 +39,7 @@ var (
 // will be released because the Session Timeout will expire, but its
 // the caller's responsibilty to halt any computation in this
 // case. This can be done by listening to the Event channel provided
-// by [zk.Connect](https://godoc.org/github.com/samuel/go-zookeeper/zk#Connect).
-//
-// tests:
-// github.com/samuel/go-zookeeper/zk#Connect
-// github.com/samuel/go-zookeeper/zk
-// github.com/samuel/go-zookeeper/zk.Connect
-// github.com/samuel/go-zookeeper/zk/Connect
+// by zk.Connect (https://godoc.org/github.com/samuel/go-zookeeper/zk#Connect).
 type RWMutex struct {
 	conn *zk.Conn
 	path string
@@ -62,21 +56,22 @@ func NewRWMutex(conn *zk.Conn, path string, acl []zk.ACL) *RWMutex {
 	return &RWMutex{conn, path, acl, ""}
 }
 
-// Acquire a read lock on a znode. This will block if there are any
-// write locks already on that znode until the write locks are
+// RLock acquires a read lock on a znode. This will block if there are
+// any write locks already on that znode until the write locks are
 // released.
 func (m *RWMutex) RLock(timeout time.Duration) error {
 	return m.lock(readLock, timeout)
 }
 
-// Acquire a write lock on a znode. This will block if there are any
-// read or write locks already on that znode until those locks are
-// released.
+// WLock acquires a write lock on a znode. This will block if there
+// are any read or write locks already on that znode until those locks
+// are released.
 func (m *RWMutex) WLock(timeout time.Duration) error {
 	return m.lock(writeLock, timeout)
 }
 
-// Release the lock. Returns an error if not currently holding the lock.
+// Unlock releases the lock. Returns an error if not currently holding
+// the lock.
 func (m *RWMutex) Unlock() error {
 	if m.curLock == "" {
 		return ErrNoLockPresent
@@ -105,7 +100,8 @@ func (m *RWMutex) lock(t lockType, timeout time.Duration) error {
 	// than us - we have to wait for them
 	var blockedBy lockType
 
-	// writes are blocked by reads and writes. reads are only blocked by writes
+	// writes are blocked by reads and writes. reads are only blocked
+	// by writes
 	if t == writeLock {
 		blockedBy = anyLock
 	} else {
