@@ -21,7 +21,7 @@ func TestDoubleBarrier(t *testing.T) {
 	for i := 0; i < n; i++ {
 		conn := setupZk(t)
 		defer conn.Close()
-		barriers[i] = NewDoubleBarrier(conn, path, strconv.Itoa(i), n)
+		barriers[i] = NewDoubleBarrier(conn, path, strconv.Itoa(i), n, publicACL)
 	}
 
 	ch := make(chan int)
@@ -111,7 +111,7 @@ func TestDoubleBarrierDirtyExit(t *testing.T) {
 			defer conns[i].Close()
 		}
 
-		barriers[i] = NewDoubleBarrier(conns[i], path, strconv.Itoa(i), n)
+		barriers[i] = NewDoubleBarrier(conns[i], path, strconv.Itoa(i), n, publicACL)
 	}
 
 	chans := make([]chan int, n)

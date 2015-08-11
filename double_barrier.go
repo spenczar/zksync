@@ -22,25 +22,29 @@ type DoubleBarrier struct {
 	path string
 	id   string
 	n    int
+	acl  []zk.ACL
 }
 
 // NewDoubleBarrier creates a DoubleBarrier using the provided
 // connection to ZooKeeper. The barrier is registered under the given
 // path, and the client will identify itself with the given ID. When
 // Enter or Exit are called, it will block until n clients have
-// similarly entered or exited.
-func NewDoubleBarrier(conn *zk.Conn, path string, id string, n int) *DoubleBarrier {
-	return &DoubleBarrier{conn, path, id, n}
+// similarly entered or exited. The acl is used when creating any
+// znodes.
+func NewDoubleBarrier(conn *zk.Conn, path string, id string, n int, acl []zk.ACL) *DoubleBarrier {
+	return &DoubleBarrier{conn, path, id, n, acl}
 }
 
+// Enter joins the computation. It registers this client at the znode,
+// and then blocks until all n clients have registered. If the path
+// does not exist, then it is created, along with any of its parents
+// if they don't exist.
 func (db *DoubleBarrier) Enter() error {
-	acl := zk.WorldACL(zk.PermAll)
-
-	if err := createParentPath(db.pathWithID(), db.conn, acl); err != nil {
+	if err := createParentPath(db.pathWithID(), db.conn, db.acl); err != nil {
 		return fmt.Errorf("createParentPath err=%q", err)
 	}
 
-	_, err := db.conn.Create(db.pathWithID(), []byte{}, zk.FlagEphemeral, acl)
+	_, err := db.conn.Create(db.pathWithID(), []byte{}, zk.FlagEphemeral, db.acl)
 	if err != nil {
 		return fmt.Errorf("failed to register err=%q", err)
 	}
@@ -52,7 +56,7 @@ func (db *DoubleBarrier) Enter() error {
 
 	if len(others) >= db.n {
 		// mark barrier as complete
-		_, err := db.conn.Create(db.path+"/ready", []byte{}, 0, acl)
+		_, err := db.conn.Create(db.path+"/ready", []byte{}, 0, db.acl)
 		if err != nil && err != zk.ErrNodeExists {
 			return fmt.Errorf("err creating ready node err=%q", err)
 		}
@@ -72,6 +76,9 @@ func (db *DoubleBarrier) Enter() error {
 	return nil
 }
 
+// Exit reports this client as done with the computation. It
+// deregisters this node from ZooKeeper, then blocks until all nodes
+// have deregistered.
 func (db *DoubleBarrier) Exit() error {
 	for {
 		// list remaining processes

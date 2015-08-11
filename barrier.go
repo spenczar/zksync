@@ -10,23 +10,29 @@ import "github.com/samuel/go-zookeeper/zk"
 type Barrier struct {
 	conn *zk.Conn
 	path string
+	acl  []zk.ACL
 }
 
-func NewBarrier(conn *zk.Conn, path string) *Barrier { return &Barrier{conn, path} }
+// NewBarrier instantiates a Barrier struct. It doesn't actually
+// create anything in ZooKeeper or communicate with ZooKeeper in any
+// way. If the path doesn't exist when `Barrier.Set()` is called, then
+// it will be created, along with any parent nodes, using the provided
+// ACL.
+func NewBarrier(conn *zk.Conn, path string, acl []zk.ACL) *Barrier {
+	return &Barrier{conn, path, acl}
+}
 
 // Set places the barrier, blocking any callers of b.Wait(). Returns
 // an error if the barrier exists; callers can handle the
 // zk.ErrNodeExists themselves.
 func (b *Barrier) Set() error {
-	acl := zk.WorldACL(zk.PermAll)
-
-	_, err := b.conn.Create(b.path, []byte{}, 0, acl)
+	_, err := b.conn.Create(b.path, []byte{}, 0, b.acl)
 	if err == zk.ErrNoNode {
-		err = createParentPath(b.path, b.conn, acl)
+		err = createParentPath(b.path, b.conn, b.acl)
 		if err != nil {
 			return err
 		}
-		_, err = b.conn.Create(b.path, []byte{}, 0, acl)
+		_, err = b.conn.Create(b.path, []byte{}, 0, b.acl)
 	}
 	return err
 }

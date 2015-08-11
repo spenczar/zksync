@@ -36,7 +36,7 @@ func TestReadLockSimpleCreation(t *testing.T) {
 	conn := setupZk(t)
 	defer conn.Close()
 
-	l := NewRWMutex(conn, testPath("TestReadLockSimpleCreation"))
+	l := NewRWMutex(conn, testPath("TestReadLockSimpleCreation"), publicACL)
 	err := l.RLock(time.Second * 1)
 	if err != nil {
 		t.Errorf("rlock err=%q", err)
@@ -49,7 +49,7 @@ func TestWriteLockSimpleCreation(t *testing.T) {
 	conn := setupZk(t)
 	defer conn.Close()
 
-	l := NewRWMutex(conn, testPath("TestWriteLockSimpleCreation"))
+	l := NewRWMutex(conn, testPath("TestWriteLockSimpleCreation"), publicACL)
 	err := l.WLock(time.Second * 1)
 	if err != nil {
 		t.Errorf("rlock err=%q", err)
@@ -75,7 +75,7 @@ func TestMultipleReadLocksDontBlock(t *testing.T) {
 			defer conn.Close()
 			defer wg.Done()
 
-			l := NewRWMutex(conn, testPath("TestMultipleReadLocksDontBlock"))
+			l := NewRWMutex(conn, testPath("TestMultipleReadLocksDontBlock"), publicACL)
 			err := l.RLock(time.Second * 1)
 			if err != nil {
 				t.Errorf("rlock err=%q", err)
@@ -106,7 +106,7 @@ func TestWriteLockBlocksReadLocks(t *testing.T) {
 	writeConn := setupZk(t)
 	defer writeConn.Close()
 
-	writeLock := NewRWMutex(writeConn, path)
+	writeLock := NewRWMutex(writeConn, path, publicACL)
 	err := writeLock.WLock(time.Second * 1)
 	if err != nil {
 		t.Fatalf("wlock err=%q", err)
@@ -114,7 +114,7 @@ func TestWriteLockBlocksReadLocks(t *testing.T) {
 
 	readConn := setupZk(t)
 	defer readConn.Close()
-	readLock := NewRWMutex(readConn, path)
+	readLock := NewRWMutex(readConn, path, publicACL)
 
 	ch := make(chan struct{})
 	go func() {
@@ -140,7 +140,7 @@ func TestReleasingWriteLockUnblocksReaders(t *testing.T) {
 	writeConn := setupZk(t)
 	defer writeConn.Close()
 
-	writeLock := NewRWMutex(writeConn, path)
+	writeLock := NewRWMutex(writeConn, path, publicACL)
 	err := writeLock.WLock(time.Second * 1)
 	if err != nil {
 		t.Fatalf("wlock err=%q", err)
@@ -148,7 +148,7 @@ func TestReleasingWriteLockUnblocksReaders(t *testing.T) {
 
 	readConn := setupZk(t)
 	defer readConn.Close()
-	readLock := NewRWMutex(readConn, path)
+	readLock := NewRWMutex(readConn, path, publicACL)
 
 	ch := make(chan struct{})
 	go func() {
@@ -179,7 +179,7 @@ func TestWriteLocksGoInOrder(t *testing.T) {
 	writeConn1 := setupZk(t)
 	defer writeConn1.Close()
 
-	writeLock1 := NewRWMutex(writeConn1, path)
+	writeLock1 := NewRWMutex(writeConn1, path, publicACL)
 	err := writeLock1.WLock(time.Second * 1)
 	if err != nil {
 		t.Fatalf("wlock 1 err=%q", err)
@@ -193,7 +193,7 @@ func TestWriteLocksGoInOrder(t *testing.T) {
 		writeConn := setupZk(t)
 		defer writeConn.Close()
 
-		writeLock := NewRWMutex(writeConn, path)
+		writeLock := NewRWMutex(writeConn, path, publicACL)
 		wg.Add(1)
 		go func(id int) {
 			createOrder <- id
@@ -230,7 +230,7 @@ func TestRWMutexDirtyExitReleasesLock(t *testing.T) {
 	writeConn1 := setupZk(t)
 	defer quietClose(writeConn1) // we plan on closing writeConn1 ourselves
 
-	writeLock1 := NewRWMutex(writeConn1, path)
+	writeLock1 := NewRWMutex(writeConn1, path, publicACL)
 	err := writeLock1.WLock(time.Second * 1)
 	if err != nil {
 		t.Fatalf("wlock 1 err=%q", err)
@@ -239,7 +239,7 @@ func TestRWMutexDirtyExitReleasesLock(t *testing.T) {
 	// queue up another who wants the lock
 	writeConn2 := setupZk(t)
 	defer writeConn2.Close()
-	writeLock2 := NewRWMutex(writeConn2, path)
+	writeLock2 := NewRWMutex(writeConn2, path, publicACL)
 
 	// try to acquire the lock, send signal when we have done so
 	ch := make(chan struct{})

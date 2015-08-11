@@ -12,7 +12,7 @@ func TestBarrierSet(t *testing.T) {
 	conn := setupZk(t)
 	defer conn.Close()
 
-	barrier := NewBarrier(conn, testPath("TestBarrierSet"))
+	barrier := NewBarrier(conn, testPath("TestBarrierSet"), publicACL)
 	err := barrier.Set()
 	if err != nil {
 		t.Fatalf("unable to set barrier: err=%q", err)
@@ -26,7 +26,7 @@ func TestBarrierUnset(t *testing.T) {
 	conn := setupZk(t)
 	defer conn.Close()
 
-	barrier := NewBarrier(conn, testPath("TestBarrierUnset"))
+	barrier := NewBarrier(conn, testPath("TestBarrierUnset"), publicACL)
 	err := barrier.Set()
 	if err != nil {
 		t.Fatalf("unable to set barrier: err=%q", err)
@@ -45,7 +45,7 @@ func TestBarrierIsBlocking(t *testing.T) {
 	conn := setupZk(t)
 	defer conn.Close()
 
-	barrier := NewBarrier(conn, testPath("TestBarrierIsBlocking"))
+	barrier := NewBarrier(conn, testPath("TestBarrierIsBlocking"), publicACL)
 	err := barrier.Set()
 	if err != nil {
 		t.Fatalf("unable to set barrier: err=%q", err)
@@ -72,7 +72,7 @@ func TestBarrierUnsetUnblocks(t *testing.T) {
 	conn := setupZk(t)
 	defer conn.Close()
 
-	barrier := NewBarrier(conn, testPath("TestBarrierUnsetUnblocks"))
+	barrier := NewBarrier(conn, testPath("TestBarrierUnsetUnblocks"), publicACL)
 	err := barrier.Set()
 	if err != nil {
 		t.Fatalf("unable to set barrier: err=%q", err)
@@ -113,11 +113,11 @@ func TestMultipleConnsSeeSameBarrier(t *testing.T) {
 
 	conn1 := setupZk(t)
 	defer conn1.Close()
-	barrier1 := NewBarrier(conn1, testPath("TestMultipleConnsSeeSameBarrier"))
+	barrier1 := NewBarrier(conn1, testPath("TestMultipleConnsSeeSameBarrier"), publicACL)
 
 	conn2 := setupZk(t)
 	defer conn2.Close()
-	barrier2 := NewBarrier(conn2, testPath("TestMultipleConnsSeeSameBarrier"))
+	barrier2 := NewBarrier(conn2, testPath("TestMultipleConnsSeeSameBarrier"), publicACL)
 
 	err := barrier1.Set()
 	if err != nil {

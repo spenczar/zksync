@@ -17,6 +17,7 @@ var (
 	zookeeperPeers = []string{"192.168.100.67:2181", "192.168.100.67:2182", "192.168.100.67:2183", "192.168.100.67:2184", "192.168.100.67:2185"}
 	zkTimeout      = time.Second * 3
 	zkPrefix       = "/zksync-test"
+	publicACL      = zk.WorldACL(zk.PermAll)
 )
 
 func init() {

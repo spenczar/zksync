@@ -24,29 +24,59 @@ var (
 	ErrNoLockPresent = errors.New("not currently holding a lock")
 )
 
+// RWMutex provides a read-write lock backed by ZooKeeper. Multiple
+// clients can use the lock as long as they use the same path on the
+// same ZooKeeper ensemble.
+//
+// Access is provided on a first-come, first-serve basis. Readers are
+// granted the lock if there are no current writers (so reads can
+// happen concurrently). Writers are only granted the lock
+// exclusively.
+//
+// It is important to release the lock with `Unlock`, of course.
+//
+// In case of an unexpected disconnection from ZooKeeper, any locks
+// will be released because the Session Timeout will expire, but its
+// the caller's responsibilty to halt any computation in this
+// case. This can be done by listening to the Event channel provided
+// by [zk.Connect](https://godoc.org/github.com/samuel/go-zookeeper/zk#Connect).
+//
+// tests:
+// github.com/samuel/go-zookeeper/zk#Connect
+// github.com/samuel/go-zookeeper/zk
+// github.com/samuel/go-zookeeper/zk.Connect
+// github.com/samuel/go-zookeeper/zk/Connect
 type RWMutex struct {
 	conn *zk.Conn
 	path string
+	acl  []zk.ACL
 
 	curLock string
 }
 
-func NewRWMutex(conn *zk.Conn, path string) *RWMutex {
-	return &RWMutex{conn, path, ""}
+// NewRWMutex creates a new RWMutex object. It doesn't actually
+// perform any locking or communicate with ZooKeeper in any way. If
+// the path does not exist, it will be created when RLock or WLock are
+// called, as will any of its parents, using the provided ACL.
+func NewRWMutex(conn *zk.Conn, path string, acl []zk.ACL) *RWMutex {
+	return &RWMutex{conn, path, acl, ""}
 }
 
-// Acquire a read lock on a znode. Times out if the lock is not
-// available after specified time.
+// Acquire a read lock on a znode. This will block if there are any
+// write locks already on that znode until the write locks are
+// released.
 func (m *RWMutex) RLock(timeout time.Duration) error {
 	return m.lock(readLock, timeout)
 }
 
-// Acquire a write lock on a znode. Times out if the lock is not
-// available after specified time.
+// Acquire a write lock on a znode. This will block if there are any
+// read or write locks already on that znode until those locks are
+// released.
 func (m *RWMutex) WLock(timeout time.Duration) error {
 	return m.lock(writeLock, timeout)
 }
 
+// Release the lock. Returns an error if not currently holding the lock.
 func (m *RWMutex) Unlock() error {
 	if m.curLock == "" {
 		return ErrNoLockPresent
@@ -105,8 +135,6 @@ func (m *RWMutex) lock(t lockType, timeout time.Duration) error {
 }
 
 func (m *RWMutex) createLock(t lockType) (string, error) {
-	acl := zk.WorldACL(zk.PermAll)
-
 	var path string
 	if t == writeLock {
 		path = m.path + "/write-"
@@ -114,13 +142,13 @@ func (m *RWMutex) createLock(t lockType) (string, error) {
 		path = m.path + "/read-"
 	}
 
-	created, err := m.conn.CreateProtectedEphemeralSequential(path, []byte{}, acl)
+	created, err := m.conn.CreateProtectedEphemeralSequential(path, []byte{}, m.acl)
 	if err == zk.ErrNoNode {
-		err := createParentPath(path, m.conn, acl)
+		err := createParentPath(path, m.conn, m.acl)
 		if err != nil {
 			return "", err
 		}
-		return m.conn.CreateProtectedEphemeralSequential(path, []byte{}, acl)
+		return m.conn.CreateProtectedEphemeralSequential(path, []byte{}, m.acl)
 	} else {
 		return created, err
 	}
