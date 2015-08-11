@@ -2,8 +2,12 @@
 
 [![GoDoc](http://godoc.internal.justin.tv/code.justin.tv/spencer/zksync?status.svg)](http://godoc.internal.justin.tv/code.justin.tv/spencer/zksync)
 
-zksync provides a set of synchronization primitives like what you'd
-find in the official [sync](http://golang.org/pkg/sync/) package.
+zksync provides a go implementation the synchronization primitives
+that you'll find in the
+[ZooKeeper documentation](http://zookeeper.apache.org/doc/r3.1.2/recipes.html):
+locks and barriers. These can be used to coordinate computation across
+multiple processes.
+
 
 ## RWMutex ##
 
