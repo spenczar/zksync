@@ -10,6 +10,8 @@ func TestBarrierSet(t *testing.T) {
 	defer cleanup(t)
 
 	conn := setupZk(t)
+	defer conn.Close()
+
 	barrier := NewBarrier(conn, testPath("TestBarrierSet"))
 	err := barrier.Set()
 	if err != nil {
@@ -22,6 +24,8 @@ func TestBarrierUnset(t *testing.T) {
 	defer cleanup(t)
 
 	conn := setupZk(t)
+	defer conn.Close()
+
 	barrier := NewBarrier(conn, testPath("TestBarrierUnset"))
 	err := barrier.Set()
 	if err != nil {
@@ -39,6 +43,8 @@ func TestBarrierIsBlocking(t *testing.T) {
 	var timeout = time.Millisecond * 50
 
 	conn := setupZk(t)
+	defer conn.Close()
+
 	barrier := NewBarrier(conn, testPath("TestBarrierIsBlocking"))
 	err := barrier.Set()
 	if err != nil {
@@ -64,6 +70,8 @@ func TestBarrierUnsetUnblocks(t *testing.T) {
 	var timeout = time.Millisecond * 50
 
 	conn := setupZk(t)
+	defer conn.Close()
+
 	barrier := NewBarrier(conn, testPath("TestBarrierUnsetUnblocks"))
 	err := barrier.Set()
 	if err != nil {
@@ -104,9 +112,11 @@ func TestMultipleConnsSeeSameBarrier(t *testing.T) {
 	var timeout = time.Millisecond * 50
 
 	conn1 := setupZk(t)
+	defer conn1.Close()
 	barrier1 := NewBarrier(conn1, testPath("TestMultipleConnsSeeSameBarrier"))
 
 	conn2 := setupZk(t)
+	defer conn2.Close()
 	barrier2 := NewBarrier(conn2, testPath("TestMultipleConnsSeeSameBarrier"))
 
 	err := barrier1.Set()
