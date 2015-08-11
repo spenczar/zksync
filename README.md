@@ -39,7 +39,8 @@ Run tests with `GOMAXPROCS=4 godep go test -timeout 10s ./...` (or
 some other value of GOMAXPROCS, of course - the point is, you want
 parallelism).
 
-Tests require a working ZooKeeper cluster. You can set this two ways:
+Tests require a working ZooKeeper cluster. You can set this in either
+of two ways:
  1. Use Vagrant. `vagrant up` will launch a VM with a 5-node ZooKeeper
     ensemble listening on 192.168.100.67, ports 2181
     through 2185. This is the assumed default in tests.
@@ -49,5 +50,6 @@ Tests require a working ZooKeeper cluster. You can set this two ways:
     $ ZOOKEEPER_PEERS=localhost:2181,localhost:2182 GOMAXPROCS=4 godep go test -timeout 10s ./...
     ```
 
-The tests will all be run under a namespace, `/zksync-test`, and will
-delete everything under that node after each test run.
+Either way, the tests will all be run under a namespace,
+`/zksync-test`, and will delete everything under that node after each
+test run.
