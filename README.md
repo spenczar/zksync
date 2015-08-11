@@ -33,6 +33,22 @@ should not obviously cause all other clients to proceed. This means
 that any client has permission to remove the barrier.
 
 
+## Double Barriers ##
+
+`Double Barriers` allow clients to synchronize start and end times of
+a computation. All participants in the double barrier should agree on
+the _number_ of participants ahead of time. Then, they each call
+`DoubleBarrier.Enter()` and block until all participants have called
+that function and written their data in ZooKeeper.
+
+When a client finishes its computation, it calls
+`DoubleBarrier.Exit()`, which will block until all clients have either
+called `DoubleBarrier.Exit()` or disconnected from ZooKeeper.
+
+_All clients must agree on the number of participants throughout the
+entry process_. If the group is expecting 5 participants, and then
+only 4 successfully call `Enter`, then those 4 will all block forever.
+
 # Development #
 
 Run tests with `GOMAXPROCS=4 godep go test -timeout 10s ./...` (or
