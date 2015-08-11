@@ -116,17 +116,10 @@ func (m *RWMutex) createLock(t lockType) (string, error) {
 
 	created, err := m.conn.CreateProtectedEphemeralSequential(path, []byte{}, acl)
 	if err == zk.ErrNoNode {
-		// Need to create the path to this znode
-		parts := strings.Split(m.path, "/")
-		prePath := ""
-		for _, p := range parts[1:] {
-			prePath += "/" + p
-			_, err := m.conn.Create(prePath, []byte{}, 0, acl)
-			if err != nil && err != zk.ErrNodeExists {
-				return "", err
-			}
+		err := createParentPath(path, m.conn, acl)
+		if err != nil {
+			return "", err
 		}
-
 		return m.conn.CreateProtectedEphemeralSequential(path, []byte{}, acl)
 	} else {
 		return created, err
