@@ -64,10 +64,16 @@ func recursiveDelete(c *zk.Conn, path string) error {
 		return err
 	}
 
-	return c.Delete(path, stat.Version)
+	if err := c.Delete(path, stat.Version); err != nil && err != zk.ErrNoNode {
+		return err
+	}
+	return nil
 }
 
 func testPath(testname string) string {
+	if testname == "" {
+		return zkPrefix
+	}
 	return zkPrefix + "/" + testname
 }
 

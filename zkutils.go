@@ -20,3 +20,16 @@ func createParentPath(path string, conn *zk.Conn, acl []zk.ACL) error {
 	}
 	return nil
 }
+
+func deleteIfExists(path string, conn *zk.Conn) error {
+	_, stat, err := conn.Get(path)
+	if err != nil && err != zk.ErrNoNode {
+		return err
+	}
+	if err != zk.ErrNoNode {
+		if err := conn.Delete(path, stat.Version); err != nil {
+			return err
+		}
+	}
+	return nil
+}
