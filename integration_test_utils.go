@@ -92,3 +92,12 @@ func fnTimesOut(f func(), timeout time.Duration) bool {
 		return true
 	}
 }
+
+// Safely closes a zookeeper connection - probably won't panic if
+// we're not currently connected (races are still possible,
+// though). Should be used sparingly.
+func quietClose(conn *zk.Conn) {
+	if conn.State() != zk.StateDisconnected {
+		conn.Close()
+	}
+}

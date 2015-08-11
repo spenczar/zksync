@@ -13,7 +13,7 @@ func TestDoubleBarrier(t *testing.T) {
 
 	var (
 		n       = 5
-		timeout = time.Millisecond * 20 * time.Duration(n) // 20ms per client
+		timeout = time.Millisecond * 50 * time.Duration(n) // 50ms per client
 		path    = testPath("TestDoubleBarrier")
 	)
 
@@ -104,9 +104,13 @@ func TestDoubleBarrierDirtyExit(t *testing.T) {
 	conns := make([]*zk.Conn, n)
 	for i := 0; i < n; i++ {
 		conns[i] = setupZk(t)
-		if i != 0 { // we will manually close conn 0
+
+		if i == 0 { // we will manually close conn 0
+			defer quietClose(conns[i])
+		} else {
 			defer conns[i].Close()
 		}
+
 		barriers[i] = NewDoubleBarrier(conns[i], path, strconv.Itoa(i), n)
 	}
 

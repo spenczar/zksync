@@ -220,3 +220,50 @@ func TestWriteLocksGoInOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestRWMutexDirtyExitReleasesLock(t *testing.T) {
+	defer cleanup(t)
+	var timeout = time.Millisecond * 30
+	path := testPath("TestRWMutexDirtyExitReleasesLock")
+
+	// grab a lock
+	writeConn1 := setupZk(t)
+	defer quietClose(writeConn1) // we plan on closing writeConn1 ourselves
+
+	writeLock1 := NewRWMutex(writeConn1, path)
+	err := writeLock1.WLock(time.Second * 1)
+	if err != nil {
+		t.Fatalf("wlock 1 err=%q", err)
+	}
+
+	// queue up another who wants the lock
+	writeConn2 := setupZk(t)
+	defer writeConn2.Close()
+	writeLock2 := NewRWMutex(writeConn2, path)
+
+	// try to acquire the lock, send signal when we have done so
+	ch := make(chan struct{})
+	go func() {
+		err := writeLock2.WLock(time.Second * 1)
+		if err != nil {
+			t.Fatalf("wlock 2 err=%q", err)
+		}
+		close(ch)
+	}()
+
+	select {
+	case <-ch:
+		t.Fatal("wlock 2 acquired lock while it was still active")
+	case <-time.After(timeout):
+	}
+
+	// disconnect writeConn1
+	writeConn1.Close()
+	// ZooKeeper should time out the session
+	select {
+	case <-ch:
+	case <-time.After(zkTimeout + timeout):
+		t.Fatal("wlock 2 failed to acquire lock after wlock1's dirty exit")
+	}
+
+}
