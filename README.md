@@ -31,3 +31,23 @@ barrier is already in place.
 Barriers are not ephemeral, since a disconnect from the barrier-setter
 should not obviously cause all other clients to proceed. This means
 that any client has permission to remove the barrier.
+
+
+# Development #
+
+Run tests with `GOMAXPROCS=4 godep go test -timeout 10s ./...` (or
+some other value of GOMAXPROCS, of course - the point is, you want
+parallelism).
+
+Tests require a working ZooKeeper cluster. You can set this two ways:
+ 1. Use Vagrant. `vagrant up` will launch a VM with a 5-node ZooKeeper
+    ensemble listening on 192.168.100.67, ports 2181
+    through 2185. This is the assumed default in tests.
+ 2. Set the environment variable `ZOOKEEPER_PEERS` to a
+    comma-separated list of ZooKeeper hostports, like so:
+    ```
+    $ ZOOKEEPER_PEERS=localhost:2181,localhost:2182 GOMAXPROCS=4 godep go test -timeout 10s ./...
+    ```
+
+The tests will all be run under a namespace, `/zksync-test`, and will
+delete everything under that node after each test run.
