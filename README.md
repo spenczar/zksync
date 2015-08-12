@@ -69,6 +69,14 @@ of two ways:
     ```
     $ ZOOKEEPER_PEERS=localhost:2181,localhost:2182 GOMAXPROCS=4 godep go test -timeout 10s ./...
     ```
+    
+The vagrant ZooKeeper cluster uses
+[Toxiproxy](https://github.com/Shopify/toxiproxy) to simulate network
+failures. By default, tests will attempt to connect to
+192.168.100.67:8474 to talk to Toxiproxy. You can override this by
+setting a `TOXIPROXY` environment variable to your preferred
+hostport. If unable to connect to Toxiproxy, then tests which rely
+upon it will be skipped.
 
 Either way, the tests will all be run under a namespace,
 `/zksync-test`, and will delete everything under that node after each

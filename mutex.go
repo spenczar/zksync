@@ -5,7 +5,6 @@ import (
 	"math"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/samuel/go-zookeeper/zk"
 )
@@ -59,15 +58,15 @@ func NewRWMutex(conn *zk.Conn, path string, acl []zk.ACL) *RWMutex {
 // RLock acquires a read lock on a znode. This will block if there are
 // any write locks already on that znode until the write locks are
 // released.
-func (m *RWMutex) RLock(timeout time.Duration) error {
-	return m.lock(readLock, timeout)
+func (m *RWMutex) RLock() error {
+	return m.lock(readLock)
 }
 
 // WLock acquires a write lock on a znode. This will block if there
 // are any read or write locks already on that znode until those locks
 // are released.
-func (m *RWMutex) WLock(timeout time.Duration) error {
-	return m.lock(writeLock, timeout)
+func (m *RWMutex) WLock() error {
+	return m.lock(writeLock)
 }
 
 // Unlock releases the lock. Returns an error if not currently holding
@@ -83,7 +82,7 @@ func (m *RWMutex) Unlock() error {
 	return m.conn.Delete(m.curLock, stat.Version)
 }
 
-func (m *RWMutex) lock(t lockType, timeout time.Duration) error {
+func (m *RWMutex) lock(t lockType) error {
 	// register our lock
 	created, err := m.createLock(t)
 	if err != nil {

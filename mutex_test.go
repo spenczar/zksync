@@ -37,7 +37,7 @@ func TestReadLockSimpleCreation(t *testing.T) {
 	defer conn.Close()
 
 	l := NewRWMutex(conn, testPath("TestReadLockSimpleCreation"), publicACL)
-	err := l.RLock(time.Second * 1)
+	err := l.RLock()
 	if err != nil {
 		t.Errorf("rlock err=%q", err)
 	}
@@ -50,7 +50,7 @@ func TestWriteLockSimpleCreation(t *testing.T) {
 	defer conn.Close()
 
 	l := NewRWMutex(conn, testPath("TestWriteLockSimpleCreation"), publicACL)
-	err := l.WLock(time.Second * 1)
+	err := l.WLock()
 	if err != nil {
 		t.Errorf("rlock err=%q", err)
 	}
@@ -76,7 +76,7 @@ func TestMultipleReadLocksDontBlock(t *testing.T) {
 			defer wg.Done()
 
 			l := NewRWMutex(conn, testPath("TestMultipleReadLocksDontBlock"), publicACL)
-			err := l.RLock(time.Second * 1)
+			err := l.RLock()
 			if err != nil {
 				t.Errorf("rlock err=%q", err)
 			}
@@ -107,7 +107,7 @@ func TestWriteLockBlocksReadLocks(t *testing.T) {
 	defer writeConn.Close()
 
 	writeLock := NewRWMutex(writeConn, path, publicACL)
-	err := writeLock.WLock(time.Second * 1)
+	err := writeLock.WLock()
 	if err != nil {
 		t.Fatalf("wlock err=%q", err)
 	}
@@ -118,7 +118,7 @@ func TestWriteLockBlocksReadLocks(t *testing.T) {
 
 	ch := make(chan struct{})
 	go func() {
-		readLock.RLock(timeout * 5)
+		readLock.RLock()
 		ch <- struct{}{}
 	}()
 
@@ -141,7 +141,7 @@ func TestReleasingWriteLockUnblocksReaders(t *testing.T) {
 	defer writeConn.Close()
 
 	writeLock := NewRWMutex(writeConn, path, publicACL)
-	err := writeLock.WLock(time.Second * 1)
+	err := writeLock.WLock()
 	if err != nil {
 		t.Fatalf("wlock err=%q", err)
 	}
@@ -152,7 +152,7 @@ func TestReleasingWriteLockUnblocksReaders(t *testing.T) {
 
 	ch := make(chan struct{})
 	go func() {
-		readLock.RLock(timeout * 5)
+		readLock.RLock()
 		ch <- struct{}{}
 	}()
 
@@ -180,7 +180,7 @@ func TestWriteLocksGoInOrder(t *testing.T) {
 	defer writeConn1.Close()
 
 	writeLock1 := NewRWMutex(writeConn1, path, publicACL)
-	err := writeLock1.WLock(time.Second * 1)
+	err := writeLock1.WLock()
 	if err != nil {
 		t.Fatalf("wlock 1 err=%q", err)
 	}
@@ -197,7 +197,7 @@ func TestWriteLocksGoInOrder(t *testing.T) {
 		wg.Add(1)
 		go func(id int) {
 			createOrder <- id
-			writeLock.WLock(time.Second * 1)
+			writeLock.WLock()
 			executeOrder <- id
 			writeLock.Unlock()
 			wg.Done()
@@ -221,17 +221,17 @@ func TestWriteLocksGoInOrder(t *testing.T) {
 	}
 }
 
-func TestRWMutexDirtyExitReleasesLock(t *testing.T) {
+func TestRWMutexCleanExitReleasesLock(t *testing.T) {
 	defer cleanup(t)
 	var timeout = time.Millisecond * 30
-	path := testPath("TestRWMutexDirtyExitReleasesLock")
+	path := testPath("TestRWMutexCleanExitReleasesLock")
 
 	// grab a lock
 	writeConn1 := setupZk(t)
 	defer quietClose(writeConn1) // we plan on closing writeConn1 ourselves
 
 	writeLock1 := NewRWMutex(writeConn1, path, publicACL)
-	err := writeLock1.WLock(time.Second * 1)
+	err := writeLock1.WLock()
 	if err != nil {
 		t.Fatalf("wlock 1 err=%q", err)
 	}
@@ -244,7 +244,7 @@ func TestRWMutexDirtyExitReleasesLock(t *testing.T) {
 	// try to acquire the lock, send signal when we have done so
 	ch := make(chan struct{})
 	go func() {
-		err := writeLock2.WLock(time.Second * 1)
+		err := writeLock2.WLock()
 		if err != nil {
 			t.Fatalf("wlock 2 err=%q", err)
 		}
@@ -263,6 +263,65 @@ func TestRWMutexDirtyExitReleasesLock(t *testing.T) {
 	select {
 	case <-ch:
 	case <-time.After(zkTimeout + timeout):
+		t.Fatal("wlock 2 failed to acquire lock after wlock1's clean exit")
+	}
+
+}
+
+func TestRWMutexRandomDisconnect(t *testing.T) {
+	if !toxiproxyEnabled {
+		t.Skipf("skipping, depends on toxiproxy")
+	}
+	if testing.Short() {
+		t.Skipf("skipping, takes at least %s", zkTimeout)
+	}
+
+	defer cleanup(t)
+
+	var (
+		path = testPath("TestRWMutexRandomDisconnect")
+	)
+
+	// make a connection that we can fiddle with
+	badConn := setupToxicZk(t)
+	defer toxiproxyClient.ResetState()
+	defer quietClose(badConn)
+
+	// grab a lock on the bad connection
+	writeLock1 := NewRWMutex(badConn, path, publicACL)
+	err := writeLock1.WLock()
+	if err != nil {
+		t.Fatalf("wlock 1 err=%q", err)
+	}
+
+	// Now make a second, good connection
+	goodConn := setupZk(t)
+	defer goodConn.Close()
+
+	// queue up for a lock on the good connection
+	writeLock2 := NewRWMutex(goodConn, path, publicACL)
+	// try to acquire the lock, send signal when we have done so
+	ch := make(chan struct{})
+	go func() {
+		err := writeLock2.WLock()
+		if err != nil {
+			t.Fatalf("wlock 2 err=%q", err)
+		}
+		ch <- struct{}{}
+	}()
+
+	// suddenly destroy the bad connection
+	for _, p := range toxiproxies {
+		p.Enabled = false
+		if err := p.Save(); err != nil {
+			t.Fatalf("unable to save change to proxy, err=%q", err)
+		}
+	}
+
+	// ZooKeeper should time out the session
+	select {
+	case <-ch:
+	case <-time.After(zkTimeout * 2):
 		t.Fatal("wlock 2 failed to acquire lock after wlock1's dirty exit")
 	}
 
