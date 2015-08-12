@@ -126,7 +126,6 @@ func (m *RWMutex) lock(t lockType) error {
 
 	m.curLock = created
 	return nil
-
 }
 
 func (m *RWMutex) createLock(t lockType) (string, error) {
@@ -174,7 +173,7 @@ func (m *RWMutex) lowestSeq(t lockType) (string, int, error) {
 			}
 		}
 	}
-	return lowestPath, lowestSeq, nil
+	return m.path + "/" + lowestPath, lowestSeq, nil
 }
 
 // watch the given path and block. does not error if the path doesn't
