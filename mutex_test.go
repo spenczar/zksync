@@ -169,6 +169,44 @@ func TestReleasingWriteLockUnblocksReaders(t *testing.T) {
 
 }
 
+func TestReleasingWriteLockUnblocksWriters(t *testing.T) {
+	defer cleanup(t)
+
+	var timeout time.Duration = 500 * time.Millisecond // how long to wait to declare readers blocked
+
+	path := testPath("TestReleasingWriteLockUnblocksWriters")
+
+	writeConn1 := setupZk(t)
+	defer writeConn1.Close()
+
+	writeLock1 := NewRWMutex(writeConn1, path, publicACL)
+	err := writeLock1.WLock()
+	if err != nil {
+		t.Fatalf("wlock1 err=%q", err)
+	}
+
+	writeConn2 := setupZk(t)
+	defer writeConn2.Close()
+	writeLock2 := NewRWMutex(writeConn2, path, publicACL)
+
+	ch := make(chan struct{})
+	go func() {
+		writeLock2.WLock()
+		ch <- struct{}{}
+	}()
+
+	err = writeLock1.Unlock()
+	if err != nil {
+		t.Fatalf("wlock1 unlock err=%q", err)
+	}
+
+	select {
+	case <-ch:
+	case <-time.After(timeout):
+		t.Error("write2 wasnt unblocked when write1 was released")
+	}
+}
+
 func TestWriteLocksGoInOrder(t *testing.T) {
 	defer cleanup(t)
 
@@ -223,7 +261,7 @@ func TestWriteLocksGoInOrder(t *testing.T) {
 
 func TestRWMutexCleanExitReleasesLock(t *testing.T) {
 	defer cleanup(t)
-	var timeout = time.Millisecond * 30
+	var timeout = time.Millisecond * 100
 	path := testPath("TestRWMutexCleanExitReleasesLock")
 
 	// grab a lock
