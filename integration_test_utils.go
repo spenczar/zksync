@@ -41,9 +41,20 @@ func init() {
 		toxiproxyPort = hostport[1]
 	}
 
-	if err := initToxiproxy(); err != nil {
-		toxiproxyEnabled = false
-		log.Printf("toxiproxy disabled, err=%q", err)
+	retries := 3
+	for i := 0; i < retries; i ++ {
+		if err := initToxiproxy(); err != nil {
+			toxiproxyEnabled = false
+			log.Printf("toxiproxy init err=%q", err)
+			time.Sleep(1 * time.Second)
+		} else {
+			toxiproxyEnabled = true
+			log.Printf("toxiproxy init success")
+			break
+		}
+	}
+	if ! toxiproxyEnabled{
+		log.Printf("toxiproxy disabled")
 	}
 }
 
@@ -117,7 +128,7 @@ func setupZk(t *testing.T) *zk.Conn {
 	if err != nil {
 		t.Fatalf("zk connect err=%q", err)
 	}
-	conn.SetLogger(testlogger{t})
+	conn.SetLogger(discardLogger{})
 	return conn
 }
 
@@ -135,7 +146,7 @@ func setupToxicZk(t *testing.T) *zk.Conn {
 		t.Fatalf("zk toxiproxy connect err=%q", err)
 	}
 	time.Sleep(1 * time.Second)
-	conn.SetLogger(testlogger{t})
+	conn.SetLogger(discardLogger{})
 	return conn
 }
 
@@ -208,11 +219,6 @@ func quietClose(conn *zk.Conn) {
 	}
 }
 
-// implements zk.Logger
-type testlogger struct {
-	t *testing.T
-}
-
-func (tl testlogger) Printf(fmt string, args ...interface{}) {
-	tl.t.Logf(fmt, args...)
-}
+// implements zk.Logger, discarding log lines
+type discardLogger struct {}
+func (l discardLogger) Printf(fmt string, args ...interface{}) {}
