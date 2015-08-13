@@ -21,6 +21,8 @@ const (
 var (
 	ErrMalformedLock = errors.New("not a valid lock")
 	ErrNoLockPresent = errors.New("not currently holding a lock")
+
+	publicACL = zk.WorldACL(zk.PermAll)
 )
 
 // RWMutex provides a read-write lock backed by ZooKeeper. Multiple
@@ -221,4 +223,175 @@ func parseLockType(path string) lockType {
 		return writeLock
 	}
 	return invalidLock
+}
+
+// LockedCreate is a convenience function which allows creation of a
+// node under a write lock. It uses a fully public ACL if it has to create
+// any nodes in lock creation.
+func LockedCreate(conn *zk.Conn, lock string, createPath string, data []byte, flag int32, acl []zk.ACL) (string, error) {
+	l := NewRWMutex(conn, lock, publicACL)
+	if err := l.WLock(); err != nil {
+		return "", err
+	}
+	defer func() {
+		err := l.Unlock()
+		if err != nil {
+			logger.Printf("error releasing lock on path=%q, err=%q", lock, err)
+		}
+	}()
+	created, err := conn.Create(createPath, data, flag, acl)
+	if err != nil {
+		return "", err
+	}
+	return created, nil
+}
+
+// LockedDelete is a convenience function which allows deleting a node
+// under a write lock. It uses a fully public ACL if it has to create
+// any nodes in lock creation.
+func LockedDelete(conn *zk.Conn, lock string, path string, version int32) error {
+	l := NewRWMutex(conn, lock, publicACL)
+	if err := l.WLock(); err != nil {
+		return err
+	}
+	defer func() {
+		err := l.Unlock()
+		if err != nil {
+			logger.Printf("error releasing lock on path=%q, err=%q", lock, err)
+		}
+	}()
+	if err := conn.Delete(path, version); err != nil {
+		return err
+	}
+	return nil
+}
+
+// LockedSet is a convenience function which allows setting a node's
+// data under a write lock. It uses a fully public ACL if it has to
+// create any nodes in lock creation.
+func LockedSet(conn *zk.Conn, lock string, path string, data []byte, version int32) (*zk.Stat, error) {
+	l := NewRWMutex(conn, lock, publicACL)
+	if err := l.WLock(); err != nil {
+		return nil, err
+	}
+	defer func() {
+		err := l.Unlock()
+		if err != nil {
+			logger.Printf("error releasing lock on path=%q, err=%q", lock, err)
+		}
+	}()
+
+	return conn.Set(path, data, version)
+}
+
+// LockedGet is a convenience function which allows reading a node's
+// data under a read lock. It uses a fully public ACL if it has to
+// create any nodes in lock creation.
+func LockedGet(conn *zk.Conn, lock string, path string) ([]byte, *zk.Stat, error) {
+
+	l := NewRWMutex(conn, lock, publicACL)
+	if err := l.RLock(); err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		err := l.Unlock()
+		if err != nil {
+			logger.Printf("error releasing lock on path=%q, err=%q", lock, err)
+		}
+	}()
+
+	return conn.Get(path)
+}
+
+// LockedGetW is a convenience function which allows reading a node's
+// data and setting up a watch on it under a read lock. It uses a
+// fully public ACL if it has to create any nodes in lock creation.
+func LockedGetW(conn *zk.Conn, lock string, path string) ([]byte, *zk.Stat, <-chan zk.Event, error) {
+
+	l := NewRWMutex(conn, lock, publicACL)
+	if err := l.RLock(); err != nil {
+		return nil, nil, nil, err
+	}
+	defer func() {
+		err := l.Unlock()
+		if err != nil {
+			logger.Printf("error releasing lock on path=%q, err=%q", lock, err)
+		}
+	}()
+
+	return conn.GetW(path)
+}
+
+// LockedChildren is a convenience function which allows reading the
+// list of a node's children under a read lock. It uses a fully public
+// ACL if it has to create any nodes in lock creation.
+func LockedChildren(conn *zk.Conn, lock string, path string) ([]string, *zk.Stat, error) {
+	l := NewRWMutex(conn, lock, publicACL)
+	if err := l.RLock(); err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		err := l.Unlock()
+		if err != nil {
+			logger.Printf("error releasing lock on path=%q, err=%q", lock, err)
+		}
+	}()
+
+	return conn.Children(path)
+}
+
+// LockedChildrenW is a convenience function which allows reading the
+// list of a node's children and setting a watch up under a read
+// lock. It uses a fully public ACL if it has to create any nodes in
+// lock creation. The lock expires when the function exits,
+func LockedChildrenW(conn *zk.Conn, lock string, path string) ([]string, *zk.Stat, <-chan zk.Event, error) {
+	l := NewRWMutex(conn, lock, publicACL)
+	if err := l.RLock(); err != nil {
+		return nil, nil, nil, err
+	}
+	defer func() {
+		err := l.Unlock()
+		if err != nil {
+			logger.Printf("error releasing lock on path=%q, err=%q", lock, err)
+		}
+	}()
+
+	return conn.ChildrenW(path)
+}
+
+// LockedExists is a convenience function which allows checking the
+// existence of a node under a read lock. It uses a fully public ACL
+// if it has to create any nodes in lock creation.
+func LockedExists(conn *zk.Conn, lock string, path string) (bool, *zk.Stat, error) {
+	l := NewRWMutex(conn, lock, publicACL)
+	if err := l.RLock(); err != nil {
+		return false, nil, err
+	}
+	defer func() {
+		err := l.Unlock()
+		if err != nil {
+			logger.Printf("error releasing lock on path=%q, err=%q", lock, err)
+		}
+	}()
+
+	return conn.Exists(path)
+}
+
+// LockedExistsW is a convenience function which allows checking the
+// existence of a node and setting up a watch on it under a read
+// lock. It uses a fully public ACL if it has to create any nodes in
+// lock creation.
+func LockedExistsW(conn *zk.Conn, lock string, path string) (bool, *zk.Stat, <-chan zk.Event, error) {
+	l := NewRWMutex(conn, lock, publicACL)
+	if err := l.RLock(); err != nil {
+		return false, nil, nil, err
+	}
+	defer func() {
+		err := l.Unlock()
+		if err != nil {
+			logger.Printf("error releasing lock on path=%q, err=%q", lock, err)
+		}
+	}()
+
+	return conn.ExistsW(path)
 }
