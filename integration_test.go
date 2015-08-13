@@ -21,7 +21,6 @@ var (
 	zookeeperPeers = []string{"192.168.100.67:2181", "192.168.100.67:2182", "192.168.100.67:2183", "192.168.100.67:2184", "192.168.100.67:2185"}
 	zkTimeout      = time.Second * 4
 	zkPrefix       = "/zksync-test"
-	publicACL      = zk.WorldACL(zk.PermAll)
 
 	toxiproxyEnabled = true
 	toxiproxyHost    = "192.168.100.67"
@@ -31,6 +30,8 @@ var (
 )
 
 func init() {
+	logger = log.New(os.Stderr, "[zksync-test] ", log.LstdFlags|log.Lmicroseconds)
+
 	if zookeeperPeersEnv := os.Getenv("ZOOKEEPER_PEERS"); zookeeperPeersEnv != "" {
 		zookeeperPeers = strings.Split(zookeeperPeersEnv, ",")
 	}
