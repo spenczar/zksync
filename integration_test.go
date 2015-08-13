@@ -42,7 +42,7 @@ func init() {
 	}
 
 	retries := 3
-	for i := 0; i < retries; i ++ {
+	for i := 0; i < retries; i++ {
 		if err := initToxiproxy(); err != nil {
 			toxiproxyEnabled = false
 			log.Printf("toxiproxy init err=%q", err)
@@ -53,7 +53,7 @@ func init() {
 			break
 		}
 	}
-	if ! toxiproxyEnabled{
+	if !toxiproxyEnabled {
 		log.Printf("toxiproxy disabled")
 	}
 }
@@ -220,5 +220,6 @@ func quietClose(conn *zk.Conn) {
 }
 
 // implements zk.Logger, discarding log lines
-type discardLogger struct {}
+type discardLogger struct{}
+
 func (l discardLogger) Printf(fmt string, args ...interface{}) {}
