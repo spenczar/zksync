@@ -33,7 +33,7 @@ func TestSequenceNumber(t *testing.T) {
 func TestReadLockSimpleCreation(t *testing.T) {
 	defer cleanup(t)
 
-	conn := setupZk(t)
+	conn := connectAllZk(t)
 	defer conn.Close()
 
 	l := NewRWMutex(conn, testPath("TestReadLockSimpleCreation"), publicACL)
@@ -46,7 +46,7 @@ func TestReadLockSimpleCreation(t *testing.T) {
 func TestWriteLockSimpleCreation(t *testing.T) {
 	defer cleanup(t)
 
-	conn := setupZk(t)
+	conn := connectAllZk(t)
 	defer conn.Close()
 
 	l := NewRWMutex(conn, testPath("TestWriteLockSimpleCreation"), publicACL)
@@ -71,7 +71,7 @@ func TestMultipleReadLocksDontBlock(t *testing.T) {
 	for i := 0; i < n; i += 1 {
 		wg.Add(1)
 		go func() {
-			conn := setupZk(t)
+			conn := connectAllZk(t)
 			defer conn.Close()
 			defer wg.Done()
 
@@ -103,7 +103,7 @@ func TestWriteLockBlocksReadLocks(t *testing.T) {
 
 	path := testPath("TestWriteLockBlocksReadLocks")
 
-	writeConn := setupZk(t)
+	writeConn := connectAllZk(t)
 	defer writeConn.Close()
 
 	writeLock := NewRWMutex(writeConn, path, publicACL)
@@ -112,7 +112,7 @@ func TestWriteLockBlocksReadLocks(t *testing.T) {
 		t.Fatalf("wlock err=%q", err)
 	}
 
-	readConn := setupZk(t)
+	readConn := connectAllZk(t)
 	defer readConn.Close()
 	readLock := NewRWMutex(readConn, path, publicACL)
 
@@ -137,7 +137,7 @@ func TestReleasingWriteLockUnblocksReaders(t *testing.T) {
 
 	path := testPath("TestReleasingWriteLockUnblocksReaders")
 
-	writeConn := setupZk(t)
+	writeConn := connectAllZk(t)
 	defer writeConn.Close()
 
 	writeLock := NewRWMutex(writeConn, path, publicACL)
@@ -146,7 +146,7 @@ func TestReleasingWriteLockUnblocksReaders(t *testing.T) {
 		t.Fatalf("wlock err=%q", err)
 	}
 
-	readConn := setupZk(t)
+	readConn := connectAllZk(t)
 	defer readConn.Close()
 	readLock := NewRWMutex(readConn, path, publicACL)
 
@@ -176,7 +176,7 @@ func TestReleasingWriteLockUnblocksWriters(t *testing.T) {
 
 	path := testPath("TestReleasingWriteLockUnblocksWriters")
 
-	writeConn1 := setupZk(t)
+	writeConn1 := connectAllZk(t)
 	defer writeConn1.Close()
 
 	writeLock1 := NewRWMutex(writeConn1, path, publicACL)
@@ -185,7 +185,7 @@ func TestReleasingWriteLockUnblocksWriters(t *testing.T) {
 		t.Fatalf("wlock1 err=%q", err)
 	}
 
-	writeConn2 := setupZk(t)
+	writeConn2 := connectAllZk(t)
 	defer writeConn2.Close()
 	writeLock2 := NewRWMutex(writeConn2, path, publicACL)
 
@@ -214,7 +214,7 @@ func TestWriteLocksGoInOrder(t *testing.T) {
 	var n = 5
 
 	// syncronously grab a lock
-	writeConn1 := setupZk(t)
+	writeConn1 := connectAllZk(t)
 	defer writeConn1.Close()
 
 	writeLock1 := NewRWMutex(writeConn1, path, publicACL)
@@ -228,7 +228,7 @@ func TestWriteLocksGoInOrder(t *testing.T) {
 	executeOrder := make(chan int, n)
 	var wg sync.WaitGroup
 	for i := 0; i < n; i += 1 {
-		writeConn := setupZk(t)
+		writeConn := connectAllZk(t)
 		defer writeConn.Close()
 
 		writeLock := NewRWMutex(writeConn, path, publicACL)
@@ -265,7 +265,7 @@ func TestRWMutexCleanExitReleasesLock(t *testing.T) {
 	path := testPath("TestRWMutexCleanExitReleasesLock")
 
 	// grab a lock
-	writeConn1 := setupZk(t)
+	writeConn1 := connectAllZk(t)
 	defer quietClose(writeConn1) // we plan on closing writeConn1 ourselves
 
 	writeLock1 := NewRWMutex(writeConn1, path, publicACL)
@@ -275,7 +275,7 @@ func TestRWMutexCleanExitReleasesLock(t *testing.T) {
 	}
 
 	// queue up another who wants the lock
-	writeConn2 := setupZk(t)
+	writeConn2 := connectAllZk(t)
 	defer writeConn2.Close()
 	writeLock2 := NewRWMutex(writeConn2, path, publicACL)
 
@@ -307,9 +307,6 @@ func TestRWMutexCleanExitReleasesLock(t *testing.T) {
 }
 
 func TestRWMutexRandomDisconnect(t *testing.T) {
-	if !toxiproxyEnabled {
-		t.Skipf("skipping, depends on toxiproxy")
-	}
 	if testing.Short() {
 		t.Skipf("skipping, takes at least %s", zkTimeout)
 	}
@@ -321,7 +318,7 @@ func TestRWMutexRandomDisconnect(t *testing.T) {
 	)
 
 	// make a connection that we can fiddle with
-	badConn := setupToxicZk(t)
+	badConn := connectZk(t, 0)
 	defer toxiproxyClient.ResetState()
 	defer quietClose(badConn)
 
@@ -333,7 +330,7 @@ func TestRWMutexRandomDisconnect(t *testing.T) {
 	}
 
 	// Now make a second, good connection
-	goodConn := setupZk(t)
+	goodConn := connectZk(t, 1)
 	defer goodConn.Close()
 
 	// queue up for a lock on the good connection
@@ -348,12 +345,10 @@ func TestRWMutexRandomDisconnect(t *testing.T) {
 		ch <- struct{}{}
 	}()
 
-	// suddenly destroy the bad connection
-	for _, p := range toxiproxies {
-		p.Enabled = false
-		if err := p.Save(); err != nil {
-			t.Fatalf("unable to save change to proxy, err=%q", err)
-		}
+	// suddenly destroy the bad connection by killing the proxy
+	zookeeperProxies[0].Enabled = false
+	if err := zookeeperProxies[0].Save(); err != nil {
+		t.Fatalf("unable to save change to proxy, err=%q", err)
 	}
 
 	// ZooKeeper should time out the session

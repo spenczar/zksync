@@ -9,10 +9,10 @@ import (
 func TestBarrierSet(t *testing.T) {
 	defer cleanup(t)
 
-	conn := setupZk(t)
+	conn := connectAllZk(t)
 	defer conn.Close()
 
-	barrier := NewBarrier(conn, testPath("TestBarrierSet"), publicACL)
+	barrier := NewBarrier(conn, testPath("/TestBarrierSet"), publicACL)
 	err := barrier.Set()
 	if err != nil {
 		t.Fatalf("unable to set barrier: err=%q", err)
@@ -23,10 +23,10 @@ func TestBarrierSet(t *testing.T) {
 func TestBarrierUnset(t *testing.T) {
 	defer cleanup(t)
 
-	conn := setupZk(t)
+	conn := connectAllZk(t)
 	defer conn.Close()
 
-	barrier := NewBarrier(conn, testPath("TestBarrierUnset"), publicACL)
+	barrier := NewBarrier(conn, testPath("/TestBarrierUnset"), publicACL)
 	err := barrier.Set()
 	if err != nil {
 		t.Fatalf("unable to set barrier: err=%q", err)
@@ -42,10 +42,10 @@ func TestBarrierIsBlocking(t *testing.T) {
 
 	var timeout = time.Millisecond * 50
 
-	conn := setupZk(t)
+	conn := connectAllZk(t)
 	defer conn.Close()
 
-	barrier := NewBarrier(conn, testPath("TestBarrierIsBlocking"), publicACL)
+	barrier := NewBarrier(conn, testPath("/TestBarrierIsBlocking"), publicACL)
 	err := barrier.Set()
 	if err != nil {
 		t.Fatalf("unable to set barrier: err=%q", err)
@@ -69,10 +69,10 @@ func TestBarrierUnsetUnblocks(t *testing.T) {
 
 	var timeout = time.Millisecond * 50
 
-	conn := setupZk(t)
+	conn := connectAllZk(t)
 	defer conn.Close()
 
-	barrier := NewBarrier(conn, testPath("TestBarrierUnsetUnblocks"), publicACL)
+	barrier := NewBarrier(conn, testPath("/TestBarrierUnsetUnblocks"), publicACL)
 	err := barrier.Set()
 	if err != nil {
 		t.Fatalf("unable to set barrier: err=%q", err)
@@ -111,13 +111,13 @@ func TestMultipleConnsSeeSameBarrier(t *testing.T) {
 
 	var timeout = time.Millisecond * 50
 
-	conn1 := setupZk(t)
+	conn1 := connectAllZk(t)
 	defer conn1.Close()
-	barrier1 := NewBarrier(conn1, testPath("TestMultipleConnsSeeSameBarrier"), publicACL)
+	barrier1 := NewBarrier(conn1, testPath("/TestMultipleConnsSeeSameBarrier"), publicACL)
 
-	conn2 := setupZk(t)
+	conn2 := connectAllZk(t)
 	defer conn2.Close()
-	barrier2 := NewBarrier(conn2, testPath("TestMultipleConnsSeeSameBarrier"), publicACL)
+	barrier2 := NewBarrier(conn2, testPath("/TestMultipleConnsSeeSameBarrier"), publicACL)
 
 	err := barrier1.Set()
 	if err != nil {

@@ -3,9 +3,6 @@ package zksync
 import (
 	"fmt"
 	"log"
-	"math/rand"
-	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -17,115 +14,59 @@ import (
 // utilities for integration tests
 
 var (
-	// By default, assume we're using the packaged vagrant cluster when running tests
-	zookeeperPeers = []string{"192.168.100.67:2181", "192.168.100.67:2182", "192.168.100.67:2183", "192.168.100.67:2184", "192.168.100.67:2185"}
-	zkTimeout      = time.Second * 4
-	zkPrefix       = "/zksync-test"
+	// use the packaged vagrant cluster for tests
+	vagrantHost = "192.168.100.67"
+	zkTimeout   = time.Second * 4
+	zkPrefix    = "/casey-test"
 
-	toxiproxyEnabled = true
-	toxiproxyHost    = "192.168.100.67"
-	toxiproxyPort    = "8474"
-	toxiproxyClient  *toxiproxy.Client
-	toxiproxies      []*toxiproxy.Proxy
+	toxiproxyHostport = "192.168.100.67:8474"
+	toxiproxyClient   *toxiproxy.Client
+
+	zookeeperAddrs   = make([]string, 0)
+	zookeeperProxies = make([]*toxiproxy.Proxy, 0)
 )
 
 func init() {
-	logger = log.New(os.Stderr, "[zksync-test] ", log.LstdFlags|log.Lmicroseconds)
-
-	if zookeeperPeersEnv := os.Getenv("ZOOKEEPER_PEERS"); zookeeperPeersEnv != "" {
-		zookeeperPeers = strings.Split(zookeeperPeersEnv, ",")
-	}
-
-	if toxiproxyAddrEnv := os.Getenv("TOXIPROXY"); toxiproxyAddrEnv != "" {
-		hostport := strings.Split(toxiproxyAddrEnv, ":")
-		toxiproxyHost = hostport[0]
-		toxiproxyPort = hostport[1]
-	}
-
+	success := false
 	retries := 3
 	for i := 0; i < retries; i++ {
 		if err := initToxiproxy(); err != nil {
-			toxiproxyEnabled = false
 			log.Printf("toxiproxy init err=%q", err)
 			time.Sleep(1 * time.Second)
 		} else {
-			toxiproxyEnabled = true
+			success = true
 			log.Printf("toxiproxy init success")
 			break
 		}
 	}
-	if !toxiproxyEnabled {
-		log.Printf("toxiproxy disabled")
+	if !success {
+		log.Fatalf("unable to connect to services. is vagrant up?")
 	}
 }
 
 func initToxiproxy() error {
-	toxiproxyClient = toxiproxy.NewClient("http://" + toxiproxyHost + ":" + toxiproxyPort)
-	n := len(zookeeperPeers)
-	toxiproxies = make([]*toxiproxy.Proxy, n)
-
-	currentProxies, err := toxiproxyClient.Proxies()
+	toxiproxyClient = toxiproxy.NewClient("http://" + toxiproxyHostport)
+	proxies, err := toxiproxyClient.Proxies()
 	if err != nil {
 		return err
 	}
-	toBeCreated := make(map[int]struct{})
-	for i := 0; i < n; i++ {
-		toBeCreated[i] = struct{}{}
-	}
-	for name, proxy := range currentProxies {
-		for id := range toBeCreated {
-			if name == fmt.Sprintf("zk-toxiproxy-%d", id) {
-				toxiproxies[id] = proxy
-				delete(toBeCreated, id)
-			}
+	for name, proxy := range proxies {
+		// toxiproxy thinks its listening on [::] since its inside
+		// vagrant - adjust the host to point to the vagrant cluster
+		// instead
+		port := strings.TrimPrefix(proxy.Listen, "[::]:")
+		hostport := fmt.Sprintf("%s:%s", vagrantHost, port)
+		if strings.HasPrefix(name, "zk") {
+			zookeeperAddrs = append(zookeeperAddrs, hostport)
+			zookeeperProxies = append(zookeeperProxies, proxy)
 		}
-	}
-
-	if len(toBeCreated) == 0 {
-		// all proxies already exist
-		return nil
-	}
-
-	// else, go create missing ones
-	for id := range toBeCreated {
-		zk := zookeeperPeers[id]
-		split := strings.Split(zk, ":")
-		upstreamPort, _ := strconv.Atoi(split[1])
-		upstreamPort = 21800 + upstreamPort%10
-		upstream := fmt.Sprintf("localhost:%d", upstreamPort)
-
-		port := rand.Intn(20000) + 20000
-		listen := fmt.Sprintf("%s:%d", split[0], port)
-
-		toxiproxies[id] = toxiproxyClient.NewProxy(&toxiproxy.Proxy{
-			Name:     fmt.Sprintf("zk-toxiproxy-%d", id),
-			Listen:   listen,
-			Upstream: upstream,
-			Enabled:  true,
-		})
-		err := toxiproxies[id].Create()
-		if err != nil {
-			return err
-		}
-		err = toxiproxies[id].Save()
-		if err != nil {
-			return err
-		}
-	}
-	// make sure all are enabled
-	for _, proxy := range toxiproxies {
-		proxy.Enabled = true
-		err = proxy.Save()
-		if err != nil {
-			return err
-		}
-
 	}
 	return nil
 }
 
-func setupZk(t *testing.T) *zk.Conn {
-	conn, _, err := zk.Connect(zookeeperPeers, zkTimeout)
+// connect to one zookeeper
+func connectZk(t *testing.T, idx int) *zk.Conn {
+	conn, _, err := zk.Connect([]string{zookeeperAddrs[idx]}, zkTimeout)
 	if err != nil {
 		t.Fatalf("zk connect err=%q", err)
 	}
@@ -133,20 +74,12 @@ func setupZk(t *testing.T) *zk.Conn {
 	return conn
 }
 
-// create a zookeeper connection through a toxiproxy. Caller should
-// call `defer toxiproxyClient.ResetState()` to clear proxy
-// state. calls t.Fatal if any error occurs.
-func setupToxicZk(t *testing.T) *zk.Conn {
-	proxyAddrs := make([]string, len(toxiproxies))
-	for i, tp := range toxiproxies {
-		proxyAddrs[i] = tp.Listen
-	}
-
-	conn, _, err := zk.Connect(proxyAddrs, zkTimeout)
+// connect to all 5 zookeepers
+func connectAllZk(t *testing.T) *zk.Conn {
+	conn, _, err := zk.Connect(zookeeperAddrs, zkTimeout)
 	if err != nil {
-		t.Fatalf("zk toxiproxy connect err=%q", err)
+		t.Fatalf("zk connect err=%q", err)
 	}
-	time.Sleep(1 * time.Second)
 	conn.SetLogger(discardLogger{})
 	return conn
 }
@@ -154,7 +87,7 @@ func setupToxicZk(t *testing.T) *zk.Conn {
 // recursively delete the testdata. intended to be called in defer,
 // and expects all other connections to have been closed already
 func cleanup(t *testing.T) {
-	conn := setupZk(t)
+	conn := connectAllZk(t)
 	err := recursiveDelete(conn, zkPrefix)
 	if err != nil {
 		t.Fatalf("cleanup err=%q", err)
@@ -192,23 +125,7 @@ func testPath(testname string) string {
 	if testname == "" {
 		return zkPrefix
 	}
-	return zkPrefix + "/" + testname
-}
-
-// return true if f takes longer than timeout to complete, false
-// otherwise
-func fnTimesOut(f func(), timeout time.Duration) bool {
-	ch := make(chan struct{})
-	go func() {
-		f()
-		ch <- struct{}{}
-	}()
-	select {
-	case <-ch:
-		return false
-	case <-time.After(timeout):
-		return true
-	}
+	return zkPrefix + testname
 }
 
 // Safely closes a zookeeper connection - probably won't panic if

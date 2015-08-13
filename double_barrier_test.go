@@ -14,12 +14,12 @@ func TestDoubleBarrier(t *testing.T) {
 	var (
 		n       = 5
 		timeout = time.Millisecond * 50 * time.Duration(n) // 50ms per client
-		path    = testPath("TestDoubleBarrier")
+		path    = testPath("/TestDoubleBarrier")
 	)
 
 	barriers := make([]*DoubleBarrier, n)
 	for i := 0; i < n; i++ {
-		conn := setupZk(t)
+		conn := connectAllZk(t)
 		defer conn.Close()
 		barriers[i] = NewDoubleBarrier(conn, path, strconv.Itoa(i), n, publicACL)
 	}
@@ -97,13 +97,13 @@ func TestDoubleBarrierDirtyExit(t *testing.T) {
 
 	var (
 		n    = 3
-		path = testPath("TestDoubleBarrierDirtyExit")
+		path = testPath("/TestDoubleBarrierDirtyExit")
 	)
 
 	barriers := make([]*DoubleBarrier, n)
 	conns := make([]*zk.Conn, n)
 	for i := 0; i < n; i++ {
-		conns[i] = setupZk(t)
+		conns[i] = connectAllZk(t)
 
 		if i == 0 { // we will manually close conn 0
 			defer quietClose(conns[i])
@@ -122,7 +122,7 @@ func TestDoubleBarrierDirtyExit(t *testing.T) {
 			if err := barriers[id].Enter(); err != nil {
 				t.Fatalf("barrier enter id=%d err=%q", id, err)
 			}
-			chans[id] <- i
+			chans[id] <- id
 		}(i)
 	}
 

@@ -9,8 +9,8 @@ import (
 func TestDeleteIfExistsDoesDelete(t *testing.T) {
 	defer cleanup(t)
 
-	conn := setupZk(t)
-	path := testPath("TestDeleteIfExists/exists")
+	conn := connectAllZk(t)
+	path := testPath("/TestDeleteIfExists/exists")
 
 	if err := createParentPath(path, conn, zk.WorldACL(zk.PermAll)); err != nil {
 		t.Fatalf("failed creating parent path err=%q", err)
@@ -32,8 +32,8 @@ func TestDeleteIfExistsDoesDelete(t *testing.T) {
 func TestDeleteIfExistsDoesntErrorIfNoNode(t *testing.T) {
 	defer cleanup(t)
 
-	conn := setupZk(t)
-	path := testPath("TestDeleteIfExists/doesntexist")
+	conn := connectAllZk(t)
+	path := testPath("/TestDeleteIfExists/doesntexist")
 
 	if err := deleteIfExists(path, conn); err != nil {
 		t.Errorf("err deleting extant path err=%q", err)
@@ -51,7 +51,7 @@ func TestDeleteIfExistsDoesntErrorIfNoNode(t *testing.T) {
 func TestCreateParentPath(t *testing.T) {
 	defer cleanup(t)
 
-	conn := setupZk(t)
+	conn := connectAllZk(t)
 
 	type testcase struct {
 		path   string
@@ -59,9 +59,9 @@ func TestCreateParentPath(t *testing.T) {
 	}
 
 	testcases := []testcase{
-		{testPath("child"), testPath("")},
-		{testPath("parent/child"), testPath("parent")},
-		{testPath("grandparent/parent/child"), testPath("grandparent/parent")},
+		{testPath("/child"), testPath("")},
+		{testPath("/parent/child"), testPath("/parent")},
+		{testPath("/grandparent/parent/child"), testPath("/grandparent/parent")},
 	}
 	for _, tc := range testcases {
 		err := createParentPath(tc.path, conn, zk.WorldACL(zk.PermAll))
