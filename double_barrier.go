@@ -83,6 +83,10 @@ func (db *DoubleBarrier) Exit() error {
 	for {
 		// list remaining processes
 		remaining, _, err := db.conn.Children(db.path)
+		if err == zk.ErrNoNode {
+			// barrier is destroyed - this means we are ready to exit
+			break
+		}
 		if err != nil {
 			return fmt.Errorf("err finding path=%s  err=%q", db.path, err)
 		}
@@ -96,18 +100,27 @@ func (db *DoubleBarrier) Exit() error {
 		}
 
 		if len(processNodes) == 0 {
-			// shouldn't be possible, but exit anyway
-			return nil
+			// we're in the middle of teardown - time to exit
+			break
 		}
 		if len(processNodes) == 1 && processNodes[0] == db.id {
-			// We're the only process still computing. Delete
-			// self and exit.
-			_, stat, err := db.conn.Get(db.pathWithID())
-			if err != nil && err != zk.ErrNoNode {
-				return fmt.Errorf("err finding self err=%q", err)
-			}
-			if err := db.conn.Delete(db.pathWithID(), stat.Version); err != nil {
+			// only one process is left, and its us.  We're the only
+			// process still computing. Delete self, delete the
+			// barrier, and exit.
+
+			// delete self
+			if err := db.conn.Delete(db.pathWithID(), -1); err != nil {
 				return fmt.Errorf("delete self err=%q", err)
+			}
+
+			// delete 'ready' marker
+			if err := db.conn.Delete(db.path+"/ready", -1); err != nil {
+				return fmt.Errorf("delete ready err=%q", err)
+			}
+
+			// delete barrier
+			if err := db.conn.Delete(db.path, -1); err != nil {
+				return fmt.Errorf("delete barrier err=%q", err)
 			}
 		}
 		// There are multiple outstanding processes. Sort them by ID.
@@ -138,6 +151,7 @@ func (db *DoubleBarrier) Exit() error {
 		}
 		<-ch
 	}
+	return nil
 }
 
 func (db *DoubleBarrier) pathWithID() string {

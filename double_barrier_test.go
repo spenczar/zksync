@@ -92,6 +92,49 @@ func TestDoubleBarrier(t *testing.T) {
 	}
 }
 
+func TestDoubleBarrierRemovedWhenDone(t *testing.T) {
+	defer cleanup(t)
+	conn := connectAllZk(t)
+	defer conn.Close()
+
+	path := testPath("/TestDoubleBarrierRemovedWhenDone")
+	barrier := NewDoubleBarrier(conn, path, "1", 1, publicACL)
+
+	enter := make(chan error)
+	go func() {
+		enter <- barrier.Enter()
+	}()
+	select {
+	case err := <-enter:
+		if err != nil {
+			t.Fatalf("enter err=%q", err)
+		}
+	case <-time.After(time.Millisecond * 250):
+		t.Fatalf("timed out on barrier entry")
+	}
+
+	exit := make(chan error)
+	go func() {
+		exit <- barrier.Exit()
+	}()
+	select {
+	case err := <-exit:
+		if err != nil {
+			t.Fatalf("enter err=%q", err)
+		}
+	case <-time.After(time.Millisecond * 250):
+		t.Fatalf("timed out on barrier exit")
+	}
+
+	exists, _, err := conn.Exists(path)
+	if err != nil {
+		t.Fatalf("exists check err=%q", err)
+	}
+	if exists {
+		t.Errorf("failed to delete barrier node %s", path)
+	}
+}
+
 func TestDoubleBarrierDirtyExit(t *testing.T) {
 	defer cleanup(t)
 
