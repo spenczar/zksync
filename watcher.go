@@ -55,8 +55,7 @@ type Watcher struct {
 
 // NewWatcher establishes a watch of watchPath, using locks at
 // lockPath. The watch is of the specified type and uses the specified
-// connection. It immediately connects to ZooKeeper and starts
-// listening.
+// connection. It immediately connects to ZooKeeper and starts listening.
 func NewWatcher(watchPath, lockPath string, t WatchType, conn *zk.Conn) *Watcher {
 	w := &Watcher{
 		watchPath:   watchPath,

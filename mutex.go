@@ -41,6 +41,8 @@ var (
 // the caller's responsibilty to halt any computation in this
 // case. This can be done by listening to the Event channel provided
 // by zk.Connect (https://godoc.org/github.com/samuel/go-zookeeper/zk#Connect).
+//
+// RWMutexes are not safe for shared local use across goroutines.
 type RWMutex struct {
 	conn *zk.Conn
 	path string
