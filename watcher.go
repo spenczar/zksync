@@ -79,6 +79,7 @@ func (w *Watcher) watch(t WatchType) {
 			w.announceErr(fmt.Errorf("err establishing lock, err=%q", err))
 			return
 		}
+		logDebug("watcher acquired read lock %s", lock.curLock)
 
 		switch t {
 		case WatchChildren:
@@ -90,10 +91,11 @@ func (w *Watcher) watch(t WatchType) {
 		}
 		if err != nil {
 			w.announceErr(err)
+			logDebug("watcher releasing read lock %s", lock.curLock)
 			lock.Unlock()
 			return
 		}
-
+		logDebug("watcher releasing read lock %s", lock.curLock)
 		err = lock.Unlock()
 		if err != nil {
 			w.announceErr(err)

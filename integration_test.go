@@ -2,7 +2,6 @@ package zksync
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"testing"
 	"time"
@@ -31,16 +30,16 @@ func init() {
 	retries := 3
 	for i := 0; i < retries; i++ {
 		if err := initToxiproxy(); err != nil {
-			log.Printf("toxiproxy init err=%q", err)
+			logError("toxiproxy init err=%q", err)
 			time.Sleep(1 * time.Second)
 		} else {
 			success = true
-			log.Printf("toxiproxy init success")
+			logInfo("toxiproxy init success")
 			break
 		}
 	}
 	if !success {
-		log.Fatalf("unable to connect to services. is vagrant up?")
+		logFatal("unable to connect to services. is vagrant up?")
 	}
 }
 
@@ -97,13 +96,13 @@ func cleanup(t *testing.T) {
 func recursiveDelete(c *zk.Conn, path string) error {
 	children, _, err := c.Children(path)
 	if err != nil && err != zk.ErrNoNode {
-		log.Printf("err finding children of %s", path)
+		logError("err finding children of %s", path)
 		return err
 	}
 	for _, child := range children {
 		err := recursiveDelete(c, path+"/"+child)
 		if err != nil && err != zk.ErrNoNode {
-			log.Printf("err deleting %s", child)
+			logError("err deleting %s", child)
 			return err
 		}
 	}
@@ -111,7 +110,7 @@ func recursiveDelete(c *zk.Conn, path string) error {
 	// get version
 	_, stat, err := c.Get(path)
 	if err != nil && err != zk.ErrNoNode {
-		log.Printf("err getting version of %s", path)
+		logError("err getting version of %s", path)
 		return err
 	}
 
