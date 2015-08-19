@@ -248,39 +248,3 @@ func parseLockType(path string) lockType {
 	}
 	return invalidLock
 }
-
-// WithReadlock runs a function under a read lock on l
-func WithReadLock(l *RWMutex, f func() error) (err error) {
-	if err := l.RLock(); err != nil {
-		return err
-	}
-	defer func() {
-		unlockErr := l.Unlock()
-		if unlockErr != nil {
-			logError("failed releasing read lock on %s - err=%q", l.path, err)
-		}
-		if err == nil {
-			err = unlockErr
-		}
-	}()
-
-	return f()
-}
-
-// WithWriteLock runs a function under a write lock on l
-func WithWriteLock(l *RWMutex, f func() error) (err error) {
-	if err := l.WLock(); err != nil {
-		return err
-	}
-	defer func() {
-		unlockErr := l.Unlock()
-		if unlockErr != nil {
-			logError("failed releasing read lock on %s - err=%q", l.path, err)
-		}
-		if err == nil {
-			err = unlockErr
-		}
-	}()
-
-	return f()
-}
