@@ -1,6 +1,6 @@
 # zksync #
 
-[![GoDoc](http://godoc.internal.justin.tv/code.justin.tv/spencer/zksync?status.svg)](http://godoc.internal.justin.tv/code.justin.tv/spencer/zksync)
+[![GoDoc](http://godoc.org/github.com/spenczar/zksync?status.svg)](http://godoc.org/github.com/spenczar/zksync)
 
 zksync provides a go implementation the synchronization primitives
 that you'll find in the
