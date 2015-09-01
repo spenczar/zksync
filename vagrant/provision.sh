@@ -2,8 +2,8 @@
 
 set -ex
 
-sudo apt-get update -qq
-sudo apt-get install -y default-jre curl
+apt-get update -qq
+apt-get install -y default-jre curl
 
 INSTALL_ROOT=/opt
 REPO="${REPO:-/vagrant}"

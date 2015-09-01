@@ -6,8 +6,7 @@ go:
   - tip
 
 before_install: 
-  - export REPO=${TRAVIS_BUILD_DIR}
-  - vagrant/provision.sh
+  - sudo REPO=${TRAVIS_BUILD_DIR} vagrant/provision.sh
 
 script: godep go test -v -race -proxy-host=localhost ./...
 
