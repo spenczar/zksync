@@ -336,13 +336,9 @@ func TestRWMutexRandomDisconnect(t *testing.T) {
 	// queue up for a lock on the good connection
 	writeLock2 := NewRWMutex(goodConn, path, publicACL)
 	// try to acquire the lock, send signal when we have done so
-	ch := make(chan struct{})
+	errs := make(chan error)
 	go func() {
-		err := writeLock2.WLock()
-		if err != nil {
-			t.Fatalf("wlock 2 err=%q", err)
-		}
-		ch <- struct{}{}
+		errs <- writeLock2.WLock()
 	}()
 
 	// suddenly destroy the bad connection by killing the proxy
@@ -353,8 +349,11 @@ func TestRWMutexRandomDisconnect(t *testing.T) {
 
 	// ZooKeeper should time out the session
 	select {
-	case <-ch:
-	case <-time.After(zkTimeout * 2):
+	case err := <-errs:
+		if err != nil {
+			t.Fatal("wlock 2 err=%q", err)
+		}
+	case <-time.After(zkTimeout * 3):
 		t.Fatal("wlock 2 failed to acquire lock after wlock1's dirty exit")
 	}
 

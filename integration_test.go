@@ -25,7 +25,7 @@ var (
 	toxiproxyClient *toxiproxy.Client
 
 	zkPrefix         = "/casey-test"
-	zkTimeout        = time.Second * 3
+	zkTimeout        = time.Second * 4
 	zookeeperAddrs   = make([]string, 0)
 	zookeeperProxies = make([]*toxiproxy.Proxy, 0)
 )
