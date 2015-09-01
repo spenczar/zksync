@@ -1,6 +1,7 @@
 package zksync
 
 import (
+	"flag"
 	"fmt"
 	"strings"
 	"testing"
@@ -10,22 +11,27 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
-// utilities for integration tests
+// by default, expect everything to be in the vagrant cluster
+const (
+	defaultProxyHost = "192.168.100.67"
+	defaultProxyPort = "8474"
+)
 
 var (
-	// use the packaged vagrant cluster for tests
-	vagrantHost = "192.168.100.67"
-	zkTimeout   = time.Second * 4
-	zkPrefix    = "/casey-test"
+	proxyHost       string
+	proxyPort       string
+	toxiproxyClient *toxiproxy.Client
 
-	toxiproxyHostport = "192.168.100.67:8474"
-	toxiproxyClient   *toxiproxy.Client
-
+	zkPrefix         = "/casey-test"
+	zkTimeout        = time.Second * 3
 	zookeeperAddrs   = make([]string, 0)
 	zookeeperProxies = make([]*toxiproxy.Proxy, 0)
 )
 
 func init() {
+
+	flag.StringVar(&proxyHost, "proxy-host", defaultProxyHost, "host that proxies connections to Kafka and ZooKeeper for tests")
+	flag.StringVar(&proxyPort, "proxy-port", defaultProxyPort, "port that proxies connections to Kafka and ZooKeeper for tests")
 	success := false
 	retries := 3
 	for i := 0; i < retries; i++ {
@@ -44,7 +50,7 @@ func init() {
 }
 
 func initToxiproxy() error {
-	toxiproxyClient = toxiproxy.NewClient("http://" + toxiproxyHostport)
+	toxiproxyClient = toxiproxy.NewClient("http://" + proxyHost + ":" + proxyPort)
 	proxies, err := toxiproxyClient.Proxies()
 	if err != nil {
 		return err
@@ -54,7 +60,7 @@ func initToxiproxy() error {
 		// vagrant - adjust the host to point to the vagrant cluster
 		// instead
 		port := strings.TrimPrefix(proxy.Listen, "[::]:")
-		hostport := fmt.Sprintf("%s:%s", vagrantHost, port)
+		hostport := fmt.Sprintf("%s:%s", proxyHost, port)
 		if strings.HasPrefix(name, "zk") {
 			zookeeperAddrs = append(zookeeperAddrs, hostport)
 			zookeeperProxies = append(zookeeperProxies, proxy)
