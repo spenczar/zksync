@@ -7,7 +7,8 @@ go:
 
 before_install: 
   - sudo REPO=${TRAVIS_BUILD_DIR} vagrant/provision.sh
+  - go get -t
 
-script: godep go test -v -race -proxy-host=localhost ./...
+script: go test -v -race -proxy-host=localhost ./...
 
 sudo: required
