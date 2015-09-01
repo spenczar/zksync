@@ -11,3 +11,4 @@ before_install:
 
 script: godep go test -v -race -proxy-host=localhost ./...
 
+sudo: required
