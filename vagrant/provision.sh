@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -ex
 
@@ -6,6 +6,7 @@ apt-get update
 yes | apt-get install default-jre curl
 
 INSTALL_ROOT=/opt
+REPO="${REPO:-/vagrant}"
 
 # install toxiproxy
 TOXIPROXY_VERSION=1.0.3
@@ -17,8 +18,8 @@ rm -f ${INSTALL_ROOT}/toxiproxy
 ln -s ${INSTALL_ROOT}/toxiproxy-${TOXIPROXY_VERSION} ${INSTALL_ROOT}/toxiproxy
 
 stop toxiproxy || true
-cp /vagrant/vagrant/toxiproxy.conf /etc/init/toxiproxy.conf
-cp /vagrant/vagrant/run_toxiproxy.sh ${INSTALL_ROOT}/
+cp ${REPO}/vagrant/toxiproxy.conf /etc/init/toxiproxy.conf
+cp ${REPO}/vagrant/run_toxiproxy.sh ${INSTALL_ROOT}/
 start toxiproxy
 
 # get zookeeper
@@ -46,7 +47,7 @@ for i in 1 2 3 4 5; do
 
     # zookeeper configuration
     ZK_CONF="${ZK_DIR}/conf/zookeeper.properties"
-    cp /vagrant/vagrant/zookeeper.properties ${ZK_CONF}
+    cp ${REPO}/vagrant/zookeeper.properties ${ZK_CONF}
 
     sed -i s#ZK_DATADIR#${ZK_DATADIR}#g ${ZK_CONF}
     sed -i s/ZK_PORT/${ZK_PORT_REAL}/g ${ZK_CONF}
@@ -56,7 +57,7 @@ for i in 1 2 3 4 5; do
     ZK_SVC=zookeeper-${ZK_PORT}
     stop $ZK_SVC || true
     # set up zk service
-    cp /vagrant/vagrant/zookeeper.conf /etc/init/${ZK_SVC}.conf
+    cp ${REPO}/vagrant/zookeeper.conf /etc/init/${ZK_SVC}.conf
     sed -i s#ZK_DIR#${ZK_DIR}#g /etc/init/${ZK_SVC}.conf
     sed -i s#ZK_CONF#${ZK_CONF}#g /etc/init/${ZK_SVC}.conf
 
