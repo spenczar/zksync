@@ -3,6 +3,8 @@ package zksync
 import (
 	"flag"
 	"fmt"
+	"log"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -29,9 +31,12 @@ var (
 )
 
 func init() {
+	SetLogger(log.New(os.Stderr, "[zksync] ", log.LstdFlags|log.Lmicroseconds))
 
 	flag.StringVar(&proxyHost, "proxy-host", defaultProxyHost, "host that proxies connections to Kafka and ZooKeeper for tests")
 	flag.StringVar(&proxyPort, "proxy-port", defaultProxyPort, "port that proxies connections to Kafka and ZooKeeper for tests")
+	flag.Parse()
+
 	success := false
 	retries := 3
 	for i := 0; i < retries; i++ {
