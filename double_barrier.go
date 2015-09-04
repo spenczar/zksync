@@ -3,6 +3,7 @@ package zksync
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/samuel/go-zookeeper/zk"
 )
@@ -18,11 +19,13 @@ import (
 // Double barrier clients need to know how many client processes are
 // participating in order to know when all clients are ready.
 type DoubleBarrier struct {
-	conn *zk.Conn
-	path string
-	id   string
-	n    int
-	acl  []zk.ACL
+	conn   *zk.Conn
+	path   string
+	id     string
+	n      int
+	acl    []zk.ACL
+	cancel chan struct{}
+	wg     *sync.WaitGroup
 }
 
 // NewDoubleBarrier creates a DoubleBarrier using the provided
@@ -32,7 +35,7 @@ type DoubleBarrier struct {
 // similarly entered or exited. The acl is used when creating any
 // znodes.
 func NewDoubleBarrier(conn *zk.Conn, path string, id string, n int, acl []zk.ACL) *DoubleBarrier {
-	return &DoubleBarrier{conn, path, id, n, acl}
+	return &DoubleBarrier{conn, path, id, n, acl, make(chan struct{}), &sync.WaitGroup{}}
 }
 
 // Enter joins the computation. It registers this client at the znode,
@@ -40,18 +43,20 @@ func NewDoubleBarrier(conn *zk.Conn, path string, id string, n int, acl []zk.ACL
 // does not exist, then it is created, along with any of its parents
 // if they don't exist.
 func (db *DoubleBarrier) Enter() error {
+	db.wg.Add(1)
+	defer db.wg.Done()
 	if err := createParentPath(db.pathWithID(), db.conn, db.acl); err != nil {
-		return fmt.Errorf("createParentPath err=%q", err)
+		return fmt.Errorf("createParentPath path=%q err=%q", db.pathWithID(), err)
 	}
 
 	_, err := db.conn.Create(db.pathWithID(), []byte{}, zk.FlagEphemeral, db.acl)
 	if err != nil {
-		return fmt.Errorf("failed to register err=%q", err)
+		return fmt.Errorf("failed to register path=%q err=%q", db.pathWithID(), err)
 	}
 
 	others, _, err := db.conn.Children(db.path)
 	if err != nil {
-		return fmt.Errorf("failed to find children err=%q", err)
+		return fmt.Errorf("failed to find children path=%q err=%q", err, db.path)
 	}
 
 	if len(others) >= db.n {
@@ -70,16 +75,31 @@ func (db *DoubleBarrier) Enter() error {
 			if ready {
 				break
 			}
-			<-ch
+			select {
+			case <-ch:
+			case <-db.cancel:
+				deleteIfExists(db.pathWithID(), db.conn)
+				return nil
+			}
 		}
 	}
 	return nil
+}
+
+// CancelEnter aborts an Enter call and cleans up as it aborts. This
+// can be used in conjunction with a timeout to exit early from a
+// Double Barrier.
+func (db *DoubleBarrier) Cancel() {
+	db.cancel <- struct{}{}
+	db.wg.Wait()
 }
 
 // Exit reports this client as done with the computation. It
 // deregisters this node from ZooKeeper, then blocks until all nodes
 // have deregistered.
 func (db *DoubleBarrier) Exit() error {
+	db.wg.Add(1)
+	defer db.wg.Done()
 	for {
 		// list remaining processes
 		remaining, _, err := db.conn.Children(db.path)
@@ -149,7 +169,11 @@ func (db *DoubleBarrier) Exit() error {
 		if !stillExists {
 			continue
 		}
-		<-ch
+		select {
+		case <-ch:
+		case <-db.cancel:
+			return nil
+		}
 	}
 	return nil
 }
