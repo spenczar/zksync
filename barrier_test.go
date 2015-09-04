@@ -92,14 +92,14 @@ func TestBarrierUnsetUnblocks(t *testing.T) {
 
 	barrier.Unset()
 
-	ch = make(chan struct{})
+	ch2 := make(chan struct{})
 	go func() {
 		barrier.Wait()
-		ch <- struct{}{}
+		ch2 <- struct{}{}
 	}()
 
 	select {
-	case <-ch:
+	case <-ch2:
 	case <-time.After(timeout):
 		t.Errorf("barrier was unset, but still blocked for at least %s", timeout)
 	}
