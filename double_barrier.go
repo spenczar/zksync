@@ -42,17 +42,24 @@ func NewDoubleBarrier(conn *zk.Conn, path string, id string, n int, acl []zk.ACL
 // and then blocks until all n clients have registered. If the path
 // does not exist, then it is created, along with any of its parents
 // if they don't exist.
-func (db *DoubleBarrier) Enter() error {
+func (db *DoubleBarrier) Enter() (err error) {
 	db.wg.Add(1)
 	defer db.wg.Done()
 	if err := createParentPath(db.pathWithID(), db.conn, db.acl); err != nil {
 		return fmt.Errorf("createParentPath path=%q err=%q", db.pathWithID(), err)
 	}
 
-	_, err := db.conn.Create(db.pathWithID(), []byte{}, zk.FlagEphemeral, db.acl)
+	_, err = db.conn.Create(db.pathWithID(), []byte{}, zk.FlagEphemeral, db.acl)
 	if err != nil {
 		return fmt.Errorf("failed to register path=%q err=%q", db.pathWithID(), err)
 	}
+	defer func() {
+		// clean up if we hit any errors
+		if err != nil {
+			logWarning("cleaning up dirty exit of barrier - deleting %s", db.pathWithID())
+			db.conn.Delete(db.pathWithID(), -1)
+		}
+	}()
 
 	others, _, err := db.conn.Children(db.path)
 	if err != nil {
