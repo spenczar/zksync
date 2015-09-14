@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// how long to wait before assuming a reader is blocked
+const timeout = time.Second * 3
+
 func TestSequenceNumber(t *testing.T) {
 	type testcase struct {
 		path string
@@ -62,12 +65,9 @@ func TestMultipleReadLocksDontBlock(t *testing.T) {
 
 	var (
 		// number of concurrent read lock holders
-		n int = 5
-
-		// how long to wait before assuming a reader is blocked
-		timeout time.Duration = 500 * time.Millisecond
+		n  int = 5
+		wg sync.WaitGroup
 	)
-	var wg sync.WaitGroup
 	for i := 0; i < n; i += 1 {
 		wg.Add(1)
 		go func() {
@@ -98,8 +98,6 @@ func TestMultipleReadLocksDontBlock(t *testing.T) {
 
 func TestWriteLockBlocksReadLocks(t *testing.T) {
 	defer cleanup(t)
-
-	var timeout time.Duration = 500 * time.Millisecond // how long to wait to declare readers blocked
 
 	path := testPath("TestWriteLockBlocksReadLocks")
 
@@ -132,8 +130,6 @@ func TestWriteLockBlocksReadLocks(t *testing.T) {
 
 func TestReleasingWriteLockUnblocksReaders(t *testing.T) {
 	defer cleanup(t)
-
-	var timeout time.Duration = 500 * time.Millisecond // how long to wait to declare readers blocked
 
 	path := testPath("TestReleasingWriteLockUnblocksReaders")
 
@@ -171,8 +167,6 @@ func TestReleasingWriteLockUnblocksReaders(t *testing.T) {
 
 func TestReleasingWriteLockUnblocksWriters(t *testing.T) {
 	defer cleanup(t)
-
-	var timeout time.Duration = 500 * time.Millisecond // how long to wait to declare readers blocked
 
 	path := testPath("TestReleasingWriteLockUnblocksWriters")
 
@@ -261,7 +255,7 @@ func TestWriteLocksGoInOrder(t *testing.T) {
 
 func TestRWMutexCleanExitReleasesLock(t *testing.T) {
 	defer cleanup(t)
-	var timeout = time.Millisecond * 100
+
 	path := testPath("TestRWMutexCleanExitReleasesLock")
 
 	// grab a lock
