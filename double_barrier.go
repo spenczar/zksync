@@ -179,6 +179,7 @@ func (db *DoubleBarrier) Exit() error {
 		select {
 		case <-ch:
 		case <-db.cancel:
+			deleteIfExists(db.pathWithID(), db.conn)
 			return nil
 		}
 	}
