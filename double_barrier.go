@@ -96,7 +96,7 @@ func (db *DoubleBarrier) Enter() (err error) {
 // CancelEnter aborts an Enter call and cleans up as it aborts. This
 // can be used in conjunction with a timeout to exit early from a
 // Double Barrier.
-func (db *DoubleBarrier) Cancel() {
+func (db *DoubleBarrier) CancelEnter() {
 	db.cancel <- struct{}{}
 	db.wg.Wait()
 }
@@ -176,12 +176,7 @@ func (db *DoubleBarrier) Exit() error {
 		if !stillExists {
 			continue
 		}
-		select {
-		case <-ch:
-		case <-db.cancel:
-			deleteIfExists(db.pathWithID(), db.conn)
-			return nil
-		}
+		<-ch
 	}
 	return nil
 }
