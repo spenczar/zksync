@@ -25,7 +25,7 @@ type DoubleBarrier struct {
 	n      int
 	acl    []zk.ACL
 	cancel chan struct{}
-	wg     *sync.WaitGroup
+	wg     sync.WaitGroup
 }
 
 // NewDoubleBarrier creates a DoubleBarrier using the provided
@@ -35,7 +35,13 @@ type DoubleBarrier struct {
 // similarly entered or exited. The acl is used when creating any
 // znodes.
 func NewDoubleBarrier(conn *zk.Conn, path string, id string, n int, acl []zk.ACL) *DoubleBarrier {
-	return &DoubleBarrier{conn, path, id, n, acl, make(chan struct{}), &sync.WaitGroup{}}
+	return &DoubleBarrier{
+		conn: conn,
+		path: path,
+		id:   id,
+		n:    n, acl: acl,
+		cancel: make(chan struct{}),
+	}
 }
 
 // Enter joins the computation. It registers this client at the znode,
