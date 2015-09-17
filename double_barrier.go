@@ -105,8 +105,7 @@ func (db *DoubleBarrier) Enter() (err error) {
 			select {
 			case <-ch:
 			case <-db.cancel:
-				deleteIfExists(db.pathWithID(), db.conn)
-				return nil
+				return db.conn.Delete(db.pathWithID(), -1)
 			}
 		}
 	}
