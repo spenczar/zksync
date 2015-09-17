@@ -29,7 +29,7 @@ func TestDoubleBarrier(t *testing.T) {
 		barriers[i] = NewDoubleBarrier(conn, path, strconv.Itoa(i), n, publicACL)
 	}
 
-	ch := make(chan int)
+	ch := make(chan int, 1)
 
 	// call Enter() and do some work in all barriers except barrier 0
 	for i := 1; i < n; i++ {
@@ -105,7 +105,7 @@ func TestDoubleBarrierRemovedWhenDone(t *testing.T) {
 	path := testPath("/TestDoubleBarrierRemovedWhenDone")
 	barrier := NewDoubleBarrier(conn, path, "1", 1, publicACL)
 
-	enter := make(chan error)
+	enter := make(chan error, 1)
 	go func() {
 		enter <- barrier.Enter()
 	}()
@@ -118,7 +118,7 @@ func TestDoubleBarrierRemovedWhenDone(t *testing.T) {
 		t.Fatalf("timed out on barrier entry")
 	}
 
-	exit := make(chan error)
+	exit := make(chan error, 1)
 	go func() {
 		exit <- barrier.Exit()
 	}()
@@ -240,7 +240,7 @@ func TestDoubleBarrierDirtyExit(t *testing.T) {
 	chans := make([]chan int, n)
 	// enter all barriers
 	for i := 0; i < n; i++ {
-		chans[i] = make(chan int)
+		chans[i] = make(chan int, 1)
 		go func(id int) {
 			if err := barriers[id].Enter(); err != nil {
 				t.Fatalf("barrier enter id=%d err=%q", id, err)
@@ -249,7 +249,7 @@ func TestDoubleBarrierDirtyExit(t *testing.T) {
 		}(i)
 	}
 
-	ch := make(chan int)
+	ch := make(chan int, n-1)
 	// tell barriers 1 through n-1 to finish cleanly
 	for i := 1; i < n; i++ {
 		go func(id int) {

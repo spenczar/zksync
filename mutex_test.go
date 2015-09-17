@@ -83,7 +83,7 @@ func TestMultipleReadLocksDontBlock(t *testing.T) {
 		}()
 	}
 
-	ch := make(chan struct{})
+	ch := make(chan struct{}, 1)
 	go func() {
 		wg.Wait()
 		ch <- struct{}{}
@@ -114,7 +114,7 @@ func TestWriteLockBlocksReadLocks(t *testing.T) {
 	defer readConn.Close()
 	readLock := NewRWMutex(readConn, path, publicACL)
 
-	ch := make(chan struct{})
+	ch := make(chan struct{}, 1)
 	go func() {
 		readLock.RLock()
 		ch <- struct{}{}
@@ -146,7 +146,7 @@ func TestReleasingWriteLockUnblocksReaders(t *testing.T) {
 	defer readConn.Close()
 	readLock := NewRWMutex(readConn, path, publicACL)
 
-	ch := make(chan struct{})
+	ch := make(chan struct{}, 1)
 	go func() {
 		readLock.RLock()
 		ch <- struct{}{}
@@ -183,7 +183,7 @@ func TestReleasingWriteLockUnblocksWriters(t *testing.T) {
 	defer writeConn2.Close()
 	writeLock2 := NewRWMutex(writeConn2, path, publicACL)
 
-	ch := make(chan struct{})
+	ch := make(chan struct{}, 1)
 	go func() {
 		writeLock2.WLock()
 		ch <- struct{}{}
@@ -274,7 +274,7 @@ func TestRWMutexCleanExitReleasesLock(t *testing.T) {
 	writeLock2 := NewRWMutex(writeConn2, path, publicACL)
 
 	// try to acquire the lock, send signal when we have done so
-	ch := make(chan struct{})
+	ch := make(chan struct{}, 1)
 	go func() {
 		err := writeLock2.WLock()
 		if err != nil {
@@ -330,7 +330,7 @@ func TestRWMutexRandomDisconnect(t *testing.T) {
 	// queue up for a lock on the good connection
 	writeLock2 := NewRWMutex(goodConn, path, publicACL)
 	// try to acquire the lock, send signal when we have done so
-	errs := make(chan error)
+	errs := make(chan error, 1)
 	go func() {
 		errs <- writeLock2.WLock()
 	}()
