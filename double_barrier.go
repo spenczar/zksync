@@ -193,10 +193,12 @@ func (db *DoubleBarrier) Exit() error {
 		// There are multiple outstanding processes. Sort them by ID.
 		sort.Strings(processNodes)
 
-		// If this is the alphabetically first process, wait for the
-		// alphabetically highest one. Else, remove self from db.path,
-		// and then wait for a change to the alphabetically first
-		// process.
+		// Each process except the first will wait until the first
+		// exits. The first will wait until it's the only one left,
+		// rechecking every time the last process exits. This
+		// minimizes strain on ZooKeeper by ensuring that just one
+		// process (at most) needs to be woken up on each node
+		// deletion, except the final deletion event.
 		var waitFor string
 		if processNodes[0] == db.id {
 			waitFor = processNodes[len(processNodes)-1]
