@@ -2,6 +2,7 @@ package zksync
 
 import (
 	"fmt"
+	"path"
 	"sort"
 	"sync"
 
@@ -30,7 +31,10 @@ type DoubleBarrier struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	// entryLock blocks cancelation while the DoubleBarrier is first
+	// entering, which ensures safe access to the waitgroup
+	entryLock sync.Mutex
+	wg        sync.WaitGroup
 }
 
 // NewDoubleBarrier creates a DoubleBarrier using the provided
@@ -58,7 +62,15 @@ func NewDoubleBarrier(conn *zk.Conn, path string, id string, n int, acl []zk.ACL
 // does not exist, then it is created, along with any of its parents
 // if they don't exist.
 func (db *DoubleBarrier) Enter() (err error) {
+	db.entryLock.Lock()
+	select {
+	case <-db.ctx.Done(): // return if canceled
+		return nil
+	default:
+	}
 	db.wg.Add(1)
+	db.entryLock.Unlock()
+
 	defer db.wg.Done()
 	if err := createParentPath(db.pathWithID(), db.conn, db.acl); err != nil {
 		return fmt.Errorf("createParentPath path=%q err=%q", db.pathWithID(), err)
@@ -95,14 +107,14 @@ func (db *DoubleBarrier) Enter() (err error) {
 
 	if len(siblingProcesses) == db.n {
 		// mark barrier as complete
-		_, err := db.conn.Create(db.path+"/ready", []byte{}, 0, db.acl)
+		_, err := db.conn.Create(db.readyPath(), []byte{}, 0, db.acl)
 		if err != nil && err != zk.ErrNodeExists {
 			return fmt.Errorf("err creating ready node err=%q", err)
 		}
 	} else {
 		// wait for someone else to mark the /ready node
 		for {
-			ready, _, ch, err := db.conn.ExistsW(db.path + "/ready")
+			ready, _, ch, err := db.conn.ExistsW(db.readyPath())
 			if err != nil {
 				return fmt.Errorf("err checking existence of ready node err=%q", err)
 			}
@@ -123,7 +135,9 @@ func (db *DoubleBarrier) Enter() (err error) {
 // can be used in conjunction with a timeout to exit early from a
 // Double Barrier.
 func (db *DoubleBarrier) CancelEnter() {
+	db.entryLock.Lock()
 	db.cancel()
+	db.entryLock.Unlock()
 	db.wg.Wait()
 }
 
@@ -147,7 +161,7 @@ func (db *DoubleBarrier) Exit() error {
 		// filter out the 'ready' node
 		processNodes := make([]string, 0)
 		for _, znode := range remaining {
-			if znode != "ready" {
+			if znode != readyNode {
 				processNodes = append(processNodes, znode)
 			}
 		}
@@ -167,7 +181,7 @@ func (db *DoubleBarrier) Exit() error {
 			}
 
 			// delete 'ready' marker
-			if err := db.conn.Delete(db.path+"/ready", -1); err != nil {
+			if err := db.conn.Delete(db.readyPath(), -1); err != nil {
 				return fmt.Errorf("delete ready err=%q", err)
 			}
 
@@ -208,5 +222,9 @@ func (db *DoubleBarrier) Exit() error {
 }
 
 func (db *DoubleBarrier) pathWithID() string {
-	return db.path + "/" + db.id
+	return path.Join(db.path, db.id)
+}
+
+func (db *DoubleBarrier) readyPath() string {
+	return path.Join(db.path, readyNode)
 }
