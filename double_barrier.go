@@ -8,6 +8,8 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
+const readyNode = "ready"
+
 // Double barriers enable clients to synchronize the beginning and the
 // end of a computation. When enough processes have joined the
 // barrier, processes start their computation and leave the barrier
@@ -67,11 +69,24 @@ func (db *DoubleBarrier) Enter() (err error) {
 		}
 	}()
 
-	others, _, err := db.conn.Children(db.path)
+	siblings, _, err := db.conn.Children(db.path)
 	if err != nil {
 		return fmt.Errorf("failed to find children path=%q err=%q", err, db.path)
 	}
-	if len(others) >= db.n {
+
+	// filter out the ready node
+	siblingProcesses := make([]string, 0)
+	for _, s := range siblings {
+		if s != readyNode {
+			siblingProcesses = append(siblingProcesses, s)
+		}
+	}
+
+	if len(siblingProcesses) > db.n {
+		return fmt.Errorf("too many sibling processes: found %d, expected %d", len(siblingProcesses), db.n)
+	}
+
+	if len(siblingProcesses) == db.n {
 		// mark barrier as complete
 		_, err := db.conn.Create(db.path+"/ready", []byte{}, 0, db.acl)
 		if err != nil && err != zk.ErrNodeExists {
