@@ -62,7 +62,7 @@ func (db *DoubleBarrier) Enter() (err error) {
 	defer func() {
 		// clean up if we hit any errors
 		if err != nil {
-			logWarning("cleaning up dirty exit of barrier - deleting %s", db.pathWithID())
+			logWarning("cleaning up dirty enter of barrier - deleting %s", db.pathWithID())
 			db.conn.Delete(db.pathWithID(), -1)
 		}
 	}()
@@ -71,7 +71,6 @@ func (db *DoubleBarrier) Enter() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to find children path=%q err=%q", err, db.path)
 	}
-
 	if len(others) >= db.n {
 		// mark barrier as complete
 		_, err := db.conn.Create(db.path+"/ready", []byte{}, 0, db.acl)
