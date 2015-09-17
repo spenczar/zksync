@@ -2,6 +2,7 @@ package zksync
 
 import (
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -133,6 +134,81 @@ func TestDoubleBarrierRemovedWhenDone(t *testing.T) {
 	if exists {
 		t.Errorf("failed to delete barrier node %s", path)
 	}
+}
+
+func TestDoubleBarrierCancel(t *testing.T) {
+	defer cleanup(t)
+
+	var (
+		n    = 3
+		path = testPath("/TestDoubleBarrierCancel")
+	)
+
+	barriers := make([]*DoubleBarrier, n)
+	conns := make([]*zk.Conn, n)
+	for i := 0; i < n; i++ {
+		conns[i] = connectAllZk(t)
+		defer conns[i].Close()
+		barriers[i] = NewDoubleBarrier(conns[i], path, strconv.Itoa(i), n, publicACL)
+	}
+
+	chans := make([]chan int, n)
+	// enter all but 1 barriers
+	for i := 0; i < n-1; i++ {
+		chans[i] = make(chan int, 1)
+		go func(id int) {
+			if err := barriers[id].Enter(); err != nil {
+				t.Fatalf("barrier enter id=%d err=%q", id, err)
+			}
+			chans[id] <- id
+		}(i)
+	}
+
+	// none of the clients should have passed the barrier entry yet
+	for i := 0; i < n-1; i++ {
+		select {
+		case <-chans[i]:
+			t.Errorf("barrier %d entered early", i)
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+
+	// cancel the clients and they should exit
+	for i := 0; i < n-1; i++ {
+		barriers[i].CancelEnter()
+		select {
+		case <-chans[i]:
+		case <-time.After(100 * time.Millisecond):
+			t.Errorf("barrier %d did not unblock after calling CancelEnter", i)
+		}
+	}
+
+	// when the last barrier (finally) joins, it shouldn't be unblocked
+	id := n - 1
+	ch := make(chan struct{}, 1)
+	go func() {
+		if err := barriers[id].Enter(); err != nil {
+			t.Fatalf("barrier enter id=%d err=%q", id, err)
+		}
+		ch <- struct{}{}
+	}()
+
+	select {
+	case <-ch:
+		t.Errorf("barrier %d was unblocked even though all its siblings canceled", id)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	// calling cancel multiple time should be ok
+	var wg sync.WaitGroup
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer wg.Done()
+			barriers[id].CancelEnter()
+		}()
+	}
+	wg.Wait()
 }
 
 func TestDoubleBarrierDirtyExit(t *testing.T) {

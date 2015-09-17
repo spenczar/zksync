@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/samuel/go-zookeeper/zk"
+	"golang.org/x/net/context"
 )
 
 const readyNode = "ready"
@@ -21,12 +22,14 @@ const readyNode = "ready"
 // Double barrier clients need to know how many client processes are
 // participating in order to know when all clients are ready.
 type DoubleBarrier struct {
-	conn   *zk.Conn
-	path   string
-	id     string
-	n      int
-	acl    []zk.ACL
-	cancel chan struct{}
+	conn *zk.Conn
+	path string
+	id   string
+	n    int
+	acl  []zk.ACL
+
+	ctx    context.Context
+	cancel context.CancelFunc
 	wg     sync.WaitGroup
 }
 
@@ -37,12 +40,16 @@ type DoubleBarrier struct {
 // similarly entered or exited. The acl is used when creating any
 // znodes.
 func NewDoubleBarrier(conn *zk.Conn, path string, id string, n int, acl []zk.ACL) *DoubleBarrier {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	return &DoubleBarrier{
-		conn: conn,
-		path: path,
-		id:   id,
-		n:    n, acl: acl,
-		cancel: make(chan struct{}),
+		conn:   conn,
+		path:   path,
+		id:     id,
+		n:      n,
+		acl:    acl,
+		ctx:    ctx,
+		cancel: cancel,
 	}
 }
 
@@ -104,7 +111,7 @@ func (db *DoubleBarrier) Enter() (err error) {
 			}
 			select {
 			case <-ch:
-			case <-db.cancel:
+			case <-db.ctx.Done():
 				return db.conn.Delete(db.pathWithID(), -1)
 			}
 		}
@@ -116,7 +123,7 @@ func (db *DoubleBarrier) Enter() (err error) {
 // can be used in conjunction with a timeout to exit early from a
 // Double Barrier.
 func (db *DoubleBarrier) CancelEnter() {
-	db.cancel <- struct{}{}
+	db.cancel()
 	db.wg.Wait()
 }
 
