@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -ex -o pipefail
 
 apt-get update -qq
 apt-get install -y default-jre curl
