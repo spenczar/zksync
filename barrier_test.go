@@ -51,7 +51,7 @@ func TestBarrierIsBlocking(t *testing.T) {
 		t.Fatalf("unable to set barrier: err=%q", err)
 	}
 
-	ch := make(chan struct{})
+	ch := make(chan struct{}, 1)
 	go func() {
 		barrier.Wait()
 		ch <- struct{}{}
@@ -78,7 +78,7 @@ func TestBarrierUnsetUnblocks(t *testing.T) {
 		t.Fatalf("unable to set barrier: err=%q", err)
 	}
 
-	ch := make(chan struct{})
+	ch := make(chan struct{}, 1)
 	go func() {
 		barrier.Wait()
 		ch <- struct{}{}
@@ -92,7 +92,7 @@ func TestBarrierUnsetUnblocks(t *testing.T) {
 
 	barrier.Unset()
 
-	ch2 := make(chan struct{})
+	ch2 := make(chan struct{}, 1)
 	go func() {
 		barrier.Wait()
 		ch2 <- struct{}{}
@@ -124,7 +124,7 @@ func TestMultipleConnsSeeSameBarrier(t *testing.T) {
 		t.Fatalf("unable to set barrier1: err=%q", err)
 	}
 
-	ch := make(chan struct{})
+	ch := make(chan struct{}, 2)
 	go func() {
 		barrier1.Wait()
 		ch <- struct{}{}
@@ -140,8 +140,6 @@ func TestMultipleConnsSeeSameBarrier(t *testing.T) {
 	case <-time.After(timeout):
 	}
 
-	ch = make(chan struct{})
-
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
@@ -154,6 +152,8 @@ func TestMultipleConnsSeeSameBarrier(t *testing.T) {
 	}()
 
 	barrier1.Unset()
+
+	ch = make(chan struct{}, 1)
 	go func() {
 		wg.Wait()
 		ch <- struct{}{}
