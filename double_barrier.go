@@ -149,7 +149,7 @@ func (db *DoubleBarrier) Exit() error {
 	defer db.wg.Done()
 	for {
 		// list remaining processes
-		remaining, _, err := db.conn.Children(db.path)
+		remaining, stat, err := db.conn.Children(db.path)
 		if err == zk.ErrNoNode {
 			// barrier is destroyed - this means we are ready to exit
 			break
@@ -186,7 +186,7 @@ func (db *DoubleBarrier) Exit() error {
 			}
 
 			// delete barrier
-			if err := db.conn.Delete(db.path, -1); err != nil {
+			if err := db.conn.Delete(db.path, stat.Version); err != nil {
 				return fmt.Errorf("delete barrier err=%q", err)
 			}
 		}
