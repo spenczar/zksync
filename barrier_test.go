@@ -153,14 +153,14 @@ func TestMultipleConnsSeeSameBarrier(t *testing.T) {
 
 	barrier1.Unset()
 
-	ch = make(chan struct{}, 1)
+	ch2 := make(chan struct{}, 1)
 	go func() {
 		wg.Wait()
-		ch <- struct{}{}
+		ch2 <- struct{}{}
 	}()
 
 	select {
-	case <-ch:
+	case <-ch2:
 	case <-time.After(timeout):
 		t.Errorf("barrier was unset, but still blocked a client for at least %s", timeout)
 	}
