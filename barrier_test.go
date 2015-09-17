@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// how long for a goroutine to spin before considering it blocked by a barrier
+const barrierTimeout = time.Millisecond * 50
+
 func TestBarrierSet(t *testing.T) {
 	defer cleanup(t)
 
@@ -40,8 +43,6 @@ func TestBarrierUnset(t *testing.T) {
 func TestBarrierIsBlocking(t *testing.T) {
 	defer cleanup(t)
 
-	var timeout = time.Millisecond * 50
-
 	conn := connectAllZk(t)
 	defer conn.Close()
 
@@ -59,15 +60,13 @@ func TestBarrierIsBlocking(t *testing.T) {
 
 	select {
 	case <-ch:
-		t.Errorf("barrier did not block for at least %s", timeout)
-	case <-time.After(timeout):
+		t.Errorf("barrier did not block for at least %s", barrierTimeout)
+	case <-time.After(barrierTimeout):
 	}
 }
 
 func TestBarrierUnsetUnblocks(t *testing.T) {
 	defer cleanup(t)
-
-	var timeout = time.Millisecond * 50
 
 	conn := connectAllZk(t)
 	defer conn.Close()
@@ -86,8 +85,8 @@ func TestBarrierUnsetUnblocks(t *testing.T) {
 
 	select {
 	case <-ch:
-		t.Errorf("barrier did not block for at least %s", timeout)
-	case <-time.After(timeout):
+		t.Errorf("barrier did not block for at least %s", barrierTimeout)
+	case <-time.After(barrierTimeout):
 	}
 
 	barrier.Unset()
@@ -100,16 +99,14 @@ func TestBarrierUnsetUnblocks(t *testing.T) {
 
 	select {
 	case <-ch2:
-	case <-time.After(timeout):
-		t.Errorf("barrier was unset, but still blocked for at least %s", timeout)
+	case <-time.After(barrierTimeout):
+		t.Errorf("barrier was unset, but still blocked for at least %s", barrierTimeout)
 	}
 
 }
 
 func TestMultipleConnsSeeSameBarrier(t *testing.T) {
 	defer cleanup(t)
-
-	var timeout = time.Millisecond * 50
 
 	conn1 := connectAllZk(t)
 	defer conn1.Close()
@@ -136,8 +133,8 @@ func TestMultipleConnsSeeSameBarrier(t *testing.T) {
 
 	select {
 	case <-ch:
-		t.Errorf("barrier did not block both clients for at least %s", timeout)
-	case <-time.After(timeout):
+		t.Errorf("barrier did not block both clients for at least %s", barrierTimeout)
+	case <-time.After(barrierTimeout):
 	}
 
 	var wg sync.WaitGroup
@@ -161,8 +158,8 @@ func TestMultipleConnsSeeSameBarrier(t *testing.T) {
 
 	select {
 	case <-ch2:
-	case <-time.After(timeout):
-		t.Errorf("barrier was unset, but still blocked a client for at least %s", timeout)
+	case <-time.After(barrierTimeout):
+		t.Errorf("barrier was unset, but still blocked a client for at least %s", barrierTimeout)
 	}
 
 }

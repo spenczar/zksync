@@ -9,13 +9,17 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
+const (
+	barrierEnterTimeout = time.Millisecond * 250
+	barrierExitTimeout  = time.Millisecond * 250
+)
+
 func TestDoubleBarrier(t *testing.T) {
 	defer cleanup(t)
 
 	var (
-		n       = 5
-		timeout = time.Millisecond * 50 * time.Duration(n) // 50ms per client
-		path    = testPath("/TestDoubleBarrier")
+		n    = 5
+		path = testPath("/TestDoubleBarrier")
 	)
 
 	barriers := make([]*DoubleBarrier, n)
@@ -41,7 +45,7 @@ func TestDoubleBarrier(t *testing.T) {
 	select {
 	case id := <-ch:
 		t.Fatalf("barrier %d did work before all barriers were ready", id)
-	case <-time.After(timeout):
+	case <-time.After(barrierEnterTimeout):
 	}
 
 	// add barrier 0
@@ -54,7 +58,7 @@ func TestDoubleBarrier(t *testing.T) {
 	for i := 0; i < n; i++ {
 		select {
 		case <-ch:
-		case <-time.After(timeout):
+		case <-time.After(barrierEnterTimeout):
 			t.Fatalf("timed out waiting for barriers to do work")
 		}
 	}
@@ -74,7 +78,7 @@ func TestDoubleBarrier(t *testing.T) {
 	select {
 	case id := <-ch:
 		t.Fatalf("barrier %d was unblocked before all barriers exited", id)
-	case <-time.After(timeout):
+	case <-time.After(barrierExitTimeout):
 	}
 
 	// exit barrier 0
@@ -87,7 +91,7 @@ func TestDoubleBarrier(t *testing.T) {
 	for i := 0; i < n; i++ {
 		select {
 		case <-ch:
-		case <-time.After(timeout):
+		case <-time.After(barrierExitTimeout):
 			t.Fatalf("timed out waiting for barriers to do work")
 		}
 	}
@@ -110,7 +114,7 @@ func TestDoubleBarrierRemovedWhenDone(t *testing.T) {
 		if err != nil {
 			t.Fatalf("enter err=%q", err)
 		}
-	case <-time.After(time.Millisecond * 250):
+	case <-time.After(barrierEnterTimeout):
 		t.Fatalf("timed out on barrier entry")
 	}
 
@@ -123,7 +127,7 @@ func TestDoubleBarrierRemovedWhenDone(t *testing.T) {
 		if err != nil {
 			t.Fatalf("enter err=%q", err)
 		}
-	case <-time.After(time.Millisecond * 250):
+	case <-time.After(barrierExitTimeout):
 		t.Fatalf("timed out on barrier exit")
 	}
 
@@ -169,7 +173,7 @@ func TestDoubleBarrierCancel(t *testing.T) {
 		select {
 		case <-chans[i]:
 			t.Errorf("barrier %d entered early", i)
-		case <-time.After(100 * time.Millisecond):
+		case <-time.After(barrierEnterTimeout):
 		}
 	}
 
@@ -178,7 +182,7 @@ func TestDoubleBarrierCancel(t *testing.T) {
 		barriers[i].CancelEnter()
 		select {
 		case <-chans[i]:
-		case <-time.After(100 * time.Millisecond):
+		case <-time.After(barrierEnterTimeout):
 			t.Errorf("barrier %d did not unblock after calling CancelEnter", i)
 		}
 	}
@@ -196,7 +200,7 @@ func TestDoubleBarrierCancel(t *testing.T) {
 	select {
 	case <-ch:
 		t.Errorf("barrier %d was unblocked even though all its siblings canceled", id)
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(barrierEnterTimeout):
 	}
 
 	// calling cancel multiple time should be ok
@@ -268,7 +272,7 @@ func TestDoubleBarrierDirtyExit(t *testing.T) {
 	for i := 0; i < n-1; i++ {
 		select {
 		case <-ch:
-		case <-time.After(zkTimeout * 2):
+		case <-time.After(barrierExitTimeout):
 			t.Fatalf("timed out waiting for barriers to do work")
 		}
 	}

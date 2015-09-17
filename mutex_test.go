@@ -7,7 +7,7 @@ import (
 )
 
 // how long to wait before assuming a reader is blocked
-const timeout = time.Second * 3
+const mutexTimeout = time.Second * 3
 
 func TestSequenceNumber(t *testing.T) {
 	type testcase struct {
@@ -91,7 +91,7 @@ func TestMultipleReadLocksDontBlock(t *testing.T) {
 
 	select {
 	case <-ch:
-	case <-time.After(timeout):
+	case <-time.After(mutexTimeout):
 		t.Error("timeout waiting for read locks to establish")
 	}
 }
@@ -123,7 +123,7 @@ func TestWriteLockBlocksReadLocks(t *testing.T) {
 	select {
 	case <-ch:
 		t.Error("read wasnt blocked by write lock's presence")
-	case <-time.After(timeout):
+	case <-time.After(mutexTimeout):
 	}
 
 }
@@ -159,7 +159,7 @@ func TestReleasingWriteLockUnblocksReaders(t *testing.T) {
 
 	select {
 	case <-ch:
-	case <-time.After(timeout):
+	case <-time.After(mutexTimeout):
 		t.Error("read wasnt unblocked when write lock was released")
 	}
 
@@ -196,7 +196,7 @@ func TestReleasingWriteLockUnblocksWriters(t *testing.T) {
 
 	select {
 	case <-ch:
-	case <-time.After(timeout):
+	case <-time.After(mutexTimeout):
 		t.Error("write2 wasnt unblocked when write1 was released")
 	}
 }
@@ -286,7 +286,7 @@ func TestRWMutexCleanExitReleasesLock(t *testing.T) {
 	select {
 	case <-ch:
 		t.Fatal("wlock 2 acquired lock while it was still active")
-	case <-time.After(timeout):
+	case <-time.After(mutexTimeout):
 	}
 
 	// disconnect writeConn1
@@ -294,7 +294,7 @@ func TestRWMutexCleanExitReleasesLock(t *testing.T) {
 	// ZooKeeper should time out the session
 	select {
 	case <-ch:
-	case <-time.After(zkTimeout + timeout):
+	case <-time.After(zkTimeout + mutexTimeout):
 		t.Fatal("wlock 2 failed to acquire lock after wlock1's clean exit")
 	}
 
