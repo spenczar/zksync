@@ -102,6 +102,7 @@ func cleanup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cleanup err=%q", err)
 	}
+	conn.Close()
 }
 
 func recursiveDelete(c *zk.Conn, path string) error {
